@@ -3,7 +3,7 @@ local format = string.format
 local M = {}
 
 local DEFAULTS = {
-    path = "UE4SS/Mods/ezFOV/ezFOV.cfg",
+    path = "UE4SS/Mods/ezFOV - only F8/ezFOV.cfg",
 
     fovs = {
         default = 75,
@@ -215,18 +215,8 @@ function M.write()
         f:write(";      X = Sideways / Lateral Offset (+Right / -Left)\n")
         f:write(";      Y = Depth Offset (Keep at 0.0 to maintain tight orbital target tracking)\n")
         f:write(";      Z = Up & Down / Height (+Up / -Down)\n;\n")
-        f:write("; GLOBAL CORE HOTKEYS:\n")
-        f:write(";   [F5]                    = Decrease active profile Field of View sharply (-25 FOV)\n")
-        f:write(";   [F6]                    = Decrease active profile Field of View smoothly (-5 FOV)\n")
-        f:write(";   [F7]                    = Increase active profile Field of View smoothly (+5 FOV)\n")
+        f:write("; GLOBAL CORE HOTKEY:\n")
         f:write(";   [F8]                    = Live Reload configuration file changes instantly\n;\n")
-        f:write("; CONTEXT-AWARE POSITION HOTKEYS (Modifies your currently active in-game mode):\n")
-        f:write(";   [CTRL + UP/DOWN ARROW]  = Move active camera position on X Axis (+50 / -50 units)\n")
-        f:write(";   [ALT  + LEFT/RIGHT]     = Move active camera position on Y Axis (+10 / -10 units)\n")
-        f:write(";   [ALT  + UP/DOWN ARROW]  = Move active camera position on Z Axis (+10 / -10 units)\n;\n")
-        f:write("; PRESET MANAGEMENT HOTKEYS:\n")
-        f:write(";   [CTRL + 1..4]           = Load Saved Camera Preset Profile\n")
-        f:write(";   [ALT  + 1..4]           = Save Current Camera Layout to Preset Slot\n")
         f:write("; =================================================================================\n\n")
 
         f:write("; ---------------------------------------------------------------------------------\n")
@@ -263,14 +253,14 @@ function M.write()
         f:write("; ---------------------------------------------------------------------------------\n")
         f:write("; LockOnYawBias (Horizontal Framing):\n")
         f:write(";   Rotates the camera view horizontally around the target.\n")
-        f:write(";   Positive (+) / [SHIFT + RIGHT ARROW] = Shifts enemy target RIGHT on screen (+1°)\n")
-        f:write(";   Negative (-) / [SHIFT + LEFT ARROW]  = Shifts enemy target LEFT on screen (-1°)\n;\n")
+        f:write(";   Positive (+) = Shifts enemy target RIGHT on screen (+1°)\n")
+        f:write(";   Negative (-) = Shifts enemy target LEFT on screen (-1°)\n;\n")
         f:write(";   COMPOSITION TIP: Combine LockOnCamX=60.0 with LockOnYawBias=5.0 to achieve \n")
         f:write(";   a gorgeous over-the-shoulder split framing (Character LEFT, Enemy RIGHT).\n;\n")
         f:write("; LockOnPitchBias (Vertical Framing):\n")
         f:write(";   Tilts the camera view plane vertically.\n")
-        f:write(";   Positive (+) / [SHIFT + UP ARROW]    = Tilts camera down / Shifts enemy target UP (+1°)\n")
-        f:write(";   Negative (-) / [SHIFT + DOWN ARROW]  = Tilts camera up / Shifts enemy target DOWN (-1°)\n")
+        f:write(";   Positive (+) = Tilts camera down / Shifts enemy target UP (+1°)\n")
+        f:write(";   Negative (-) = Tilts camera up / Shifts enemy target DOWN (-1°)\n")
         f:write("; ---------------------------------------------------------------------------------\n")
         f:write(format("LockOnYawBias=%.1f\n", cfg.LockOnYawBias or 0))
         f:write(format("LockOnPitchBias=%.1f\n\n", cfg.LockOnPitchBias or 0))
