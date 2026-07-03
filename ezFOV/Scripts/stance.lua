@@ -1,4 +1,5 @@
 local PlayerCtx = require("playercontext")
+local Logging   = require("logging")
 
 local math_abs = math.abs
 
@@ -11,14 +12,30 @@ local M = {
 
 local Camera, Config
 
+-- Local helper logging functions to prefix messages with the module name and enforce level
+local function log_warn(message, once_key, cache)
+    Logging.log_warn("Stance", message, once_key, cache)
+end
+
+local function log_error(message, once_key, cache)
+    Logging.log_error("Stance", message, once_key, cache)
+end
+
+local function log_debug(message, once_key, cache)
+    Logging.log_debug("Stance", message, once_key, cache)
+end
+-- ========================================================================================
+
 function M.init(cameraMod, configMod)
     Camera = cameraMod
     Config = configMod
+    _ready_warned = false
 end
 
 local _lockon_last_true  = os.clock() -- Initialize to the active engine clock instead of 0
 local _LOCKON_EXIT_GRACE = 0.4
 local _grace_logged      = false
+local _ready_warned      = false
 
 local function safe_call(fn)
     local ok, r = pcall(fn)
@@ -27,9 +44,15 @@ local function safe_call(fn)
 end
 
 local function ready()
-    if PlayerCtx.is_disabled()          then return false end
+    if PlayerCtx.is_disabled() then return false end
     if PlayerCtx.camera_or_pc_invalid() then return false end
-    if not Camera or not Config         then return false end
+    if not Camera or not Config then
+        if not _ready_warned then
+            log_warn("Stance helper was invoked before Camera/Config were initialized.", "stance_not_ready", true)
+            _ready_warned = true
+        end
+        return false
+    end
     return true
 end
 
@@ -49,12 +72,12 @@ local function choose_profile(state, cfg)
         if since_last < _LOCKON_EXIT_GRACE then
             if not _grace_logged then
                 _grace_logged = true
-                print(string.format("[Stance] Lock-on grace period active (%.0fms remaining)\n",
-                    (_LOCKON_EXIT_GRACE - since_last) * 1000))
+                log_debug(string.format("Lock-on grace period active (%.0fms remaining)",
+                    (_LOCKON_EXIT_GRACE - since_last) * 1000), "lockon_grace_active")
             end
             return "lockon"
         end
-        print("[Stance] Lock-on grace period expired, exiting lock-on\n")
+        log_debug("Lock-on grace period expired, exiting lock-on", "lockon_grace_expired")
     end
 
     if state.battle == true                                then return "battle"  end
@@ -77,6 +100,10 @@ end
 local function apply_fov_transition(target_fov, steps_override)
     if target_fov == nil then return end
     if M._applied_fov and math_abs(M._applied_fov - target_fov) < 0.1 then return end
+    if not Camera or not Camera.set_fov_via_function then
+        log_error("Unable to apply an FOV transition because the camera module is unavailable.", "stance_missing_camera_fov", true)
+        return
+    end
 
     local cfg = Config.get()
     local steps = steps_override or cfg.FOVTransitionSteps
@@ -98,6 +125,11 @@ local function apply_position_for_profile(profile, cfg, steps_override)
     end
 
     if pos then
+        if not Camera or not Camera.set_camera_relative_location then
+            log_error("Unable to apply a camera position transition because the camera module is unavailable.", "stance_missing_camera_position", true)
+            return
+        end
+
         ExecuteInGameThread(function()
             Camera.set_camera_relative_location(pos, steps_override)
         end)
@@ -111,16 +143,24 @@ local function apply_profile(profile, cfg)
     M._applied_profile = profile
 
     if prev == "lockon" then
+        if not Camera or not Camera.stop_enforcement then
+            log_error("Unable to leave lock-on mode because the camera module is unavailable.", "stance_missing_camera_stop", true)
+            return
+        end
         Camera.stop_enforcement()
     end
 
     if profile == "lockon" then
+        if not Camera or not Camera.start_enforcement then
+            log_error("Unable to enter lock-on mode because the camera module is unavailable.", "stance_missing_camera_start", true)
+            return
+        end
         local fov = fov_for_profile("lockon", cfg)
         M._applied_fov = fov
         Camera.start_enforcement(cfg.LockOnPosition, fov)
-        print(string.format("[Stance] -> lockon FOV=%.0f Pos=(%.0f,%.0f,%.0f) YawBias=%.1f PitchBias=%.1f\n",
+        log_debug(string.format("-> lockon FOV=%.0f Pos=(%.0f,%.0f,%.0f) YawBias=%.1f PitchBias=%.1f",
             fov, cfg.LockOnPosition.x or 0, cfg.LockOnPosition.y or 0, cfg.LockOnPosition.z or 0,
-            cfg.LockOnYawBias or 0, cfg.LockOnPitchBias or 0))
+            cfg.LockOnYawBias or 0, cfg.LockOnPitchBias or 0), "lockon_profile_applied")
         return
     end
 
