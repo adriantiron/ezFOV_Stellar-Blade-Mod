@@ -1,5 +1,6 @@
 local UEHelpers = require("UEHelpers")
 local PlayerCtx = require("playercontext")
+local Logging   = require("logging")
 
 local math_abs   = math.abs
 local math_sin   = math.sin
@@ -52,10 +53,31 @@ local _ENFORCE_TICK_MS   = 8
 local _ENFORCE_RETRY_MS  = 50
 local _enforce_miss_count = 0
 
-local function safe_write(fn)
+-- Local helper logging functions to prefix messages with the module name and enforce level
+local function log_warn(message, once_key, cache)
+    Logging.log_warn("Camera", message, once_key, cache)
+end
+
+local function log_error(message, once_key, cache)
+    Logging.log_error("Camera", message, once_key, cache)
+end
+
+local function log_debug(message, once_key, cache)
+    Logging.log_debug("Camera", message, once_key, cache)
+end
+-- ========================================================================================
+
+local function obj_is_valid(obj)
+    if not obj then return false end
+    if type(obj.IsValid) ~= "function" then return true end
+    local ok, valid = pcall(function() return obj:IsValid() end)
+    return ok and valid == true
+end
+
+local function safe_write(fn, context)
     local ok, err = pcall(fn)
     if not ok then
-        print("[Camera] [WARNING] Property write failed (object likely mid-destruction): " .. tostring(err) .. "\n")
+        log_warn((context or "Property write") .. " failed (object likely mid-destruction): " .. tostring(err), "safe_write_fail")
     end
     return ok
 end
@@ -76,25 +98,25 @@ local function get_camera_yaw_raw(snap)
     local ok1, rot1 = pcall(function() return snap.pc:GetControlRotation() end)
     if ok1 and rot1 and rot1.Yaw ~= nil then
         _yaw_fn = function(s) return s.pc:GetControlRotation().Yaw end
-        print("[Camera] Yaw source: GetControlRotation()\n")
+        log_debug("Yaw source resolved via GetControlRotation()", "yaw_source_rotation")
         return tonumber(rot1.Yaw) or 0
     end
 
     local ok2, rot2 = pcall(function() return snap.boom:K2_GetComponentRotation() end)
     if ok2 and rot2 and rot2.Yaw ~= nil then
         _yaw_fn = function(s) return s.boom:K2_GetComponentRotation().Yaw end
-        print("[Camera] Yaw source: boom K2_GetComponentRotation()\n")
+        log_debug("Yaw source resolved via boom K2_GetComponentRotation()", "yaw_source_boom")
         return tonumber(rot2.Yaw) or 0
     end
 
     local ok3, rot3 = pcall(function() return snap.cam:K2_GetComponentRotation() end)
     if ok3 and rot3 and rot3.Yaw ~= nil then
         _yaw_fn = function(s) return s.cam:K2_GetComponentRotation().Yaw end
-        print("[Camera] Yaw source: cam K2_GetComponentRotation()\n")
+        log_debug("Yaw source resolved via cam K2_GetComponentRotation()", "yaw_source_cam")
         return tonumber(rot3.Yaw) or 0
     end
 
-    print("[Camera] [CRITICAL] Execution Failure: Unable to locate valid Camera Yaw reflection source across known engine methods!\n")
+    log_error("Unable to locate a valid camera yaw source across the known engine methods; yaw-based bias and lock-on positioning may be unstable.", "yaw_source_failure")
     return 0
 end
 
@@ -159,12 +181,17 @@ local function save_originals(snap)
     _originals_saved = true
     _saved_originals = {}
 
-    if snap.boom and snap.boom:IsValid() then
+    if not snap then
+        log_error("Cannot save camera originals because the snapshot is unavailable.", "save_originals_no_snapshot", true)
+        return
+    end
+
+    if obj_is_valid(snap.boom) then
         local to = snap.boom.TargetOffset
         if to then _saved_originals.target = { X = to.X, Y = to.Y, Z = to.Z } end
     end
 
-    if snap.cam and snap.boom:IsValid() then
+    if obj_is_valid(snap.cam) then
         local rr = snap.cam.RelativeRotation
         if rr then _saved_originals.rel_rot = { Pitch = rr.Pitch, Yaw = rr.Yaw, Roll = rr.Roll } end
     end
@@ -209,11 +236,22 @@ end
 -- ==================== FOV transition ====================
 
 function M.set_fov_via_function(target_fov, overrideSteps)
-    if PlayerCtx.camera_or_pc_invalid() then return end
+    if PlayerCtx.camera_or_pc_invalid() then
+        log_warn("FOV transition aborted because the player camera context is unavailable.", "fov_transition_invalid_context")
+        return
+    end
 
     local snap = PlayerCtx.get_snapshot()
-    if not snap then return end
+    if not snap then
+        log_warn("FOV transition aborted because the camera snapshot is unavailable.", "fov_transition_invalid_snapshot")
+        return
+    end
+
     local cam = snap.cam
+    if not obj_is_valid(cam) then
+        log_warn("FOV transition aborted because the camera component is invalid.", "fov_transition_invalid_cam")
+        return
+    end
 
     if M._fov_transition_token then
         CancelDelay(M._fov_transition_token)
@@ -232,7 +270,7 @@ function M.set_fov_via_function(target_fov, overrideSteps)
             M._active_target_fov = nil
             return
         end
-        if not cam or not cam:IsValid() then
+        if not obj_is_valid(cam) then
             PlayerCtx.temporarily_disable()
             M._fov_transition_token = nil
             M._active_target_fov = nil
@@ -257,13 +295,26 @@ end
 -- ==================== Camera position transition ====================
 
 function M.set_camera_relative_location(target_position, overrideSteps)
-    if PlayerCtx.camera_or_pc_invalid() then return end
+    if PlayerCtx.camera_or_pc_invalid() then
+        log_warn("Camera position transition aborted because the camera context is unavailable.", "camera_rel_loc_invalid_context", true)
+        return
+    end
 
     local snap = PlayerCtx.get_snapshot()
-    if not snap then return end
+    if not snap then
+        log_warn("Camera position transition aborted because the camera snapshot is unavailable.", "camera_rel_loc_no_snapshot", true)
+        return
+    end
+
     local cam = snap.cam
+    if not obj_is_valid(cam) then
+        log_warn("Camera position transition aborted because the camera component is invalid.", "camera_rel_loc_invalid_cam", true)
+        return
+    end
+
     local loc = cam and cam.RelativeLocation
     if not loc then
+        log_warn("Camera position transition aborted because RelativeLocation is unavailable.", "camera_loc_missing")
         PlayerCtx.temporarily_disable()
         return
     end
@@ -390,7 +441,7 @@ function M.set_camera_relative_location(target_position, overrideSteps)
                    and math_abs(M._active_target_position.y - to.y) < 0.01
                    and math_abs(M._active_target_position.z - to.z) < 0.01 then
                     
-                    print(string.format("[Camera] [DIAG] Coordinate correction drift detected (dx:%.1f, dy:%.1f, dz:%.1f). Re-syncing interpolation path.\n", dx, dy, dz))
+                    log_warn(string.format("Camera position interpolation drifted beyond safe bounds (dx:%.1f, dy:%.1f, dz:%.1f); re-syncing from the current camera state.", dx, dy, dz), "camera_transition_drift")
                     
                     restart_from_current()
                     M._cam_transition_token = ExecuteWithDelay(1, tick)
@@ -414,11 +465,21 @@ end
 
 function M.disable_camera_collision(flag)
     local s = PlayerCtx.get_snapshot()
-    if not s then return end
+    if not s then
+        log_warn("Camera collision toggle skipped because the snapshot is unavailable.", "collision_toggle_missing")
+        return
+    end
 
     ExecuteInGameThread(function()
         local snap = PlayerCtx.get_snapshot()
-        if not snap then return end
+        if not snap then
+            log_warn("Camera collision toggle failed because the snapshot became invalid mid-thread.", "collision_toggle_midthread")
+            return
+        end
+        if not obj_is_valid(snap.boom) then
+            log_warn("Camera collision toggle skipped because the boom component is unavailable.", "collision_toggle_missing_boom")
+            return
+        end
         snap.boom.bDoCollisionTest = not flag
     end)
 end
@@ -426,6 +487,11 @@ end
 -- ==================== Init ====================
 
 function M.init(cfg)
+    if not cfg then
+        log_error("Camera initialization aborted because no config was provided.", "camera_init_missing_cfg", true)
+        return
+    end
+
     if M._already_initialized then return end
     M._already_initialized = true
     M._cfg = cfg
@@ -442,15 +508,24 @@ end
 -- ==================== FOV enforcement (non-lock-on) ====================
 
 function M.enforce_fov(target_fov)
-    if PlayerCtx.camera_or_pc_invalid() then return end
+    if PlayerCtx.camera_or_pc_invalid() then
+        log_warn("FOV enforcement skipped because the camera context is unavailable.", "enforce_fov_invalid_context", true)
+        return
+    end
     if M._fov_transition_token then return end
 
     local snap = PlayerCtx.get_snapshot()
-    if not snap then return end
+    if not snap then
+        log_warn("FOV enforcement skipped because the camera snapshot is unavailable.", "enforce_fov_no_snapshot", true)
+        return
+    end
     local cam = snap.cam
-    
+
     -- Hard validation check before accessing properties
-    if not cam or not cam:IsValid() then return end
+    if not obj_is_valid(cam) then
+        log_warn("FOV enforcement skipped because the camera component is invalid.", "enforce_fov_invalid_cam", true)
+        return
+    end
 
     local actual = cam.ManualCameraFov
     if actual == nil then return end
@@ -464,9 +539,9 @@ end
 -- ==================== Lock-on enforcement ====================
 
 local function enf_validate_refs()
-    if _enf_cam and _enf_cam:IsValid()
-       and _enf_boom and _enf_boom:IsValid()
-       and _enf_pawn and _enf_pawn:IsValid() then
+    if obj_is_valid(_enf_cam)
+       and obj_is_valid(_enf_boom)
+       and obj_is_valid(_enf_pawn) then
         return true
     end
 
@@ -506,6 +581,10 @@ function M.start_enforcement(pos, fov)
 
     -- Read biases from config
     local cfg = require("config").get()
+    if not cfg then
+        log_error("Lock-on enforcement could not start because the config module returned no data.", "enforcement_start_missing_cfg", true)
+        return
+    end
     M._enforce_yaw_bias   = cfg.LockOnYawBias   or 0
     M._enforce_pitch_bias = cfg.LockOnPitchBias or 0
 
@@ -545,11 +624,13 @@ function M.start_enforcement(pos, fov)
             local world_x = lateral * right_x + depth * fwd_x
             local world_y = lateral * right_y + depth * fwd_y
 
-            local to = _enf_boom.TargetOffset
-            if to then
-                to.X = world_x
-                to.Y = world_y
-                to.Z = height
+            if _enf_boom and obj_is_valid(_enf_boom) then
+                local to = _enf_boom.TargetOffset
+                if to then
+                    to.X = world_x
+                    to.Y = world_y
+                    to.Z = height
+                end
             end
         end
 
@@ -557,7 +638,7 @@ function M.start_enforcement(pos, fov)
         local has_yaw   = M._enforce_yaw_bias   and M._enforce_yaw_bias   ~= 0
         local has_pitch = M._enforce_pitch_bias and M._enforce_pitch_bias ~= 0
         if has_yaw or has_pitch then
-            local rel_rot = _enf_cam.RelativeRotation
+            local rel_rot = obj_is_valid(_enf_cam) and _enf_cam.RelativeRotation or nil
             if rel_rot then
                 if has_yaw then
                     rel_rot.Yaw = M._enforce_yaw_bias
@@ -579,13 +660,13 @@ function M.start_enforcement(pos, fov)
         _enforce_token = ExecuteWithDelay(_ENFORCE_TICK_MS, loop)
     end
 
-    print(string.format("[Camera] Enforcement ON Pos=(%.1f,%.1f,%.1f) FOV=%s YawBias=%.1f PitchBias=%.1f\n",
+    log_debug(string.format("Enforcement started with Pos=(%.1f,%.1f,%.1f) FOV=%s YawBias=%.1f PitchBias=%.1f",
         M._enforce_pos and M._enforce_pos.x or 0,
         M._enforce_pos and M._enforce_pos.y or 0,
         M._enforce_pos and M._enforce_pos.z or 0,
         tostring(M._enforce_fov or "—"),
         M._enforce_yaw_bias or 0,
-        M._enforce_pitch_bias or 0))
+        M._enforce_pitch_bias or 0), "enforce_start")
 
     loop()
 end
@@ -608,7 +689,7 @@ function M.stop_enforcement()
     if was_active then
         -- Force the restoration helper to run inside the thread worker
         restore_originals()
-        print("[Camera] Enforcement OFF\n")
+        log_debug("Enforcement stopped and original camera state restoration was requested.", "enforce_stop")
     end
 end
 

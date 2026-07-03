@@ -1,4 +1,5 @@
 local Heartbeat = require("heartbeat")
+local Logging   = require("logging")
 
 local math_sqrt = math.sqrt
 
@@ -11,6 +12,20 @@ local PlayerCtx = {
     _on_disable = {},
 }
 
+-- Local helper logging functions to prefix messages with the module name and enforce level
+local function log_warn(message, once_key, cache)
+    Logging.log_warn("PlayerCtx", message, once_key, cache)
+end
+
+local function log_error(message, once_key, cache)
+    Logging.log_error("PlayerCtx", message, once_key, cache)
+end
+
+local function log_debug(message, once_key, cache)
+    Logging.log_debug("PlayerCtx", message, once_key, cache)
+end
+-- ========================================================================================
+
 local function _drop_caches()
     PlayerCtx._pc   = nil
     PlayerCtx._pawn = nil
@@ -21,19 +36,15 @@ end
 local function _notify_disable()
     for i = 1, #PlayerCtx._on_disable do
         local ok, err = pcall(PlayerCtx._on_disable[i])
-        if not ok then print("[PlayerCtx] on_disable handler error: " .. tostring(err) .. "\n") end
+        if not ok then log_error("on_disable handler error: " .. tostring(err), "on_disable_handler_error") end
     end
 end
 
-local function _valid(o)
-    return o and o.IsValid and o:IsValid()
-end
-
-local _dbg_once = {}
-local function _dbg(key, msg)
-    if _dbg_once[key] then return end
-    _dbg_once[key] = true
-    print("[PlayerCtx] " .. msg .. "\n")
+local function obj_is_valid(obj)
+    if not obj then return false end
+    if type(obj.IsValid) ~= "function" then return true end
+    local ok, valid = pcall(function() return obj:IsValid() end)
+    return ok and valid == true
 end
 
 local _lockon_fn    = nil
@@ -71,7 +82,7 @@ function PlayerCtx.on_disable(fn)
 end
 
 function PlayerCtx.force_disable(reason)
-    if reason then print("[PlayerCtx] force_disable: " .. tostring(reason) .. "\n") end
+    if reason then log_warn("force_disable: " .. tostring(reason), "force_disable") end
     if not PlayerCtx._disabled then
         PlayerCtx._disabled = true
         _drop_caches()
@@ -93,11 +104,11 @@ end
 
 function PlayerCtx.get_pc()
     if PlayerCtx.is_disabled() then return nil end
-    if _valid(PlayerCtx._pc) then return PlayerCtx._pc end
+    if obj_is_valid(PlayerCtx._pc) then return PlayerCtx._pc end
 
     local ok, pc = pcall(function() return FindFirstOf("SBPlayerController") end)
-    if not ok or not _valid(pc) then
-        _dbg("pc_missing", "get_pc: SBPlayerController not ready yet")
+    if not ok or not obj_is_valid(pc) then
+        log_debug("get_pc: SBPlayerController not ready yet", "pc_missing", true)
         return nil
     end
     PlayerCtx._pc = pc
@@ -106,17 +117,17 @@ end
 
 function PlayerCtx.get_pawn()
     if PlayerCtx.is_disabled() then return nil end
-    if _valid(PlayerCtx._pawn) then return PlayerCtx._pawn end
+    if obj_is_valid(PlayerCtx._pawn) then return PlayerCtx._pawn end
 
     local pc = PlayerCtx.get_pc()
     if not pc then
-        _dbg("pawn_no_pc", "get_pawn: no player controller yet")
+        log_debug("get_pawn: no player controller yet", "pawn_no_pc", true)
         return nil
     end
 
     local ok, pawn = pcall(function() return pc.Pawn end)
-    if not ok or not _valid(pawn) then
-        _dbg("pawn_missing", "get_pawn: pawn not ready yet")
+    if not ok or not obj_is_valid(pawn) then
+        log_debug("get_pawn: pawn not ready yet", "pawn_missing", true)
         return nil
     end
     PlayerCtx._pawn = pawn
@@ -125,17 +136,17 @@ end
 
 function PlayerCtx.get_camera()
     if PlayerCtx.is_disabled() then return nil end
-    if _valid(PlayerCtx._cam) then return PlayerCtx._cam end
+    if obj_is_valid(PlayerCtx._cam) then return PlayerCtx._cam end
 
     local pawn = PlayerCtx.get_pawn()
     if not pawn then
-        _dbg("cam_no_pawn", "get_camera: no pawn yet")
+        log_debug("get_camera: no pawn yet", "cam_no_pawn", true)
         return nil
     end
 
     local ok, cam = pcall(function() return pawn.FollowCamera end)
-    if not ok or not _valid(cam) then
-        _dbg("cam_missing", "get_camera: FollowCamera not ready yet")
+    if not ok or not obj_is_valid(cam) then
+        log_debug("get_camera: FollowCamera not ready yet", "cam_missing", true)
         return nil
     end
     PlayerCtx._cam = cam
@@ -144,17 +155,17 @@ end
 
 function PlayerCtx.get_camera_boom()
     if PlayerCtx.is_disabled() then return nil end
-    if _valid(PlayerCtx._boom) then return PlayerCtx._boom end
+    if obj_is_valid(PlayerCtx._boom) then return PlayerCtx._boom end
 
     local pawn = PlayerCtx.get_pawn()
     if not pawn then
-        _dbg("boom_no_pawn", "get_camera_boom: no pawn yet")
+        log_debug("get_camera_boom: no pawn yet", "boom_no_pawn", true)
         return nil
     end
 
     local ok, boom = pcall(function() return pawn.CameraBoom end)
-    if not ok or not _valid(boom) then
-        _dbg("boom_missing", "get_camera_boom: CameraBoom not ready yet")
+    if not ok or not obj_is_valid(boom) then
+        log_debug("get_camera_boom: CameraBoom not ready yet", "boom_missing", true)
         return nil
     end
     PlayerCtx._boom = boom
@@ -164,7 +175,7 @@ end
 function PlayerCtx.is_tps_mode()
     if Heartbeat.is_disabled() then return nil end
     local pawn = PlayerCtx.get_pawn()
-    if not pawn or not pawn:IsValid() then return nil end
+    if not obj_is_valid(pawn) then return nil end
     local ok, result = pcall(function() return pawn:IsTPSMode() end)
     if ok then return result end
     return nil
@@ -173,7 +184,7 @@ end
 function PlayerCtx.is_battle()
     if Heartbeat.is_disabled() then return nil end
     local pawn = PlayerCtx.get_pawn()
-    if not pawn or not pawn:IsValid() then return nil end
+    if not obj_is_valid(pawn) then return nil end
     local ok, result = pcall(function() return pawn:IsBattle() end)
     if ok then return result end
     return nil
@@ -182,7 +193,7 @@ end
 function PlayerCtx.is_lock_on()
     if Heartbeat.is_disabled() then return nil end
     local pawn = PlayerCtx.get_pawn()
-    if not pawn or not pawn:IsValid() then return nil end
+    if not obj_is_valid(pawn) then return nil end
 
     if _lockon_fn then
         local ok, result = pcall(_lockon_fn, pawn)
@@ -197,7 +208,7 @@ function PlayerCtx.is_lock_on()
     local ok_bl, val_bl = pcall(function() return pawn.bLockOn end)
     if ok_bl and type(val_bl) == "boolean" then
         _lockon_fn = function(p) return p.bLockOn end
-        print("[PlayerCtx] Lock-on detection: using bLockOn property\n")
+        log_debug("Lock-on detection: using bLockOn property", "lockon_detect_bLockOn")
         return val_bl
     end
 
@@ -210,7 +221,7 @@ function PlayerCtx.is_lock_on()
         local ok, result = pcall(m.fn, pawn)
         if ok then
             _lockon_fn = m.fn
-            print("[PlayerCtx] Lock-on detection: using " .. m.name .. "()\n")
+            log_debug("Lock-on detection: using " .. m.name .. "()", "lockon_detect_" .. m.name)
             return result
         end
     end
@@ -223,11 +234,11 @@ function PlayerCtx.is_lock_on()
             if t.IsValid then return t:IsValid() end
             return true
         end
-        print("[PlayerCtx] Lock-on detection: using LockOnCharacter property\n")
+        log_debug("Lock-on detection: using LockOnCharacter property", "lockon_detect_LockOnCharacter")
         return _lockon_fn(pawn)
     end
 
-    print("[PlayerCtx] WARNING: No lock-on detection method found!\n")
+    log_warn("No lock-on detection method found!", "lockon_detect_none")
     return nil
 end
 
@@ -256,12 +267,12 @@ local _loco = {
 
 function PlayerCtx.get_locomotion_state()
     local pawn = PlayerCtx.get_pawn()
-    if not pawn or (pawn.IsValid and not pawn:IsValid()) then
+    if not obj_is_valid(pawn) then
         return _loco.last_state
     end
 
     local ok_cm, cm = pcall(function() return pawn.CharacterMovement end)
-    if not ok_cm or not cm or (cm.IsValid and not cm:IsValid()) then
+    if not ok_cm or not cm or (not obj_is_valid(cm)) then
         return _loco.last_state
     end
 
@@ -312,8 +323,8 @@ function PlayerCtx.get_snapshot()
     local cam  = PlayerCtx._cam
     local boom = PlayerCtx._boom
 
-    if not (pc and pc:IsValid() and pawn and pawn:IsValid()
-            and cam and cam:IsValid() and boom and boom:IsValid()) then
+    if not (obj_is_valid(pc) and obj_is_valid(pawn)
+            and obj_is_valid(cam) and obj_is_valid(boom)) then
         return nil
     end
 
