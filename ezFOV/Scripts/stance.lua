@@ -192,17 +192,29 @@ function M.pulse()
 
     local cfg = Config.get()
 
-    local state = {
-        tps    = (safe_call(function() return PlayerCtx.is_tps_mode() end) == true),
-        lockon = (safe_call(function() return PlayerCtx.is_lock_on()  end) == true),
-        battle = (safe_call(function() return PlayerCtx.is_battle()   end) == true),
-        locomotion = safe_call(function()
-            return PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state()
-        end),
-    }
+    local state = {}
 
+    log_debug("Pulse state: starting TPS check", "pulse_tps_check", true)
+    state.tps = (safe_call(function() return PlayerCtx.is_tps_mode() end) == true)
+
+    log_debug("Pulse state: starting Lockon check", "pulse_lockon_check", true)
+    state.lockon = (safe_call(function() return PlayerCtx.is_lock_on() end) == true)
+
+    log_debug("Pulse state: starting Battle check", "pulse_battle_check", true) -- If you see this, but not the next, is_battle is crashing
+    state.battle = (safe_call(function() return PlayerCtx.is_battle() end) == true)
+
+    log_debug("Pulse state: starting Locomotion check", "pulse_locomotion_check", true)
+    state.locomotion = safe_call(function()
+        return PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state()
+    end)
+
+    log_debug("Pulse state: gathered. Choosing profile...", "pulse_choose_profile", true)
     local profile = choose_profile(state, cfg)
+
+    log_debug("Pulse state: applying profile...", "pulse_apply_profile", true)
     apply_profile(profile, cfg)
+
+    log_debug("Pulse state: profile applied.", "pulse_profile_applied", true)
 
     if M._applied_profile == "lockon" then return end
 
