@@ -8,6 +8,7 @@ local math_cos   = math.cos
 local math_rad   = math.rad
 local math_max   = math.max
 local math_min   = math.min
+local math_floor = math.floor
 local os_clock   = os.clock
 
 local M = {
@@ -21,6 +22,16 @@ local M = {
     _active_target_position = nil,
     _active_duration_ms     = nil,
     _anim_start_ms          = nil,
+
+    _lockon_exit_token        = nil,
+    _lockon_exit_active       = false,
+    _lockon_exit_start_ms     = nil,
+    _lockon_exit_duration_ms = nil,
+    _lockon_exit_from_pos     = nil,
+    _lockon_exit_to_pos       = nil,
+    _lockon_exit_from_fov     = nil,
+    _lockon_exit_to_fov       = nil,
+    _lockon_was_active        = false,
 
     _enforce_pos        = nil,
     _enforce_fov        = nil,
@@ -53,6 +64,13 @@ local _ENFORCE_TICK_MS   = 8
 local _ENFORCE_RETRY_MS  = 50
 local _enforce_miss_count = 0
 
+local _collision_warn_last = {
+    missing_snapshot = 0,
+    midthread_snapshot = 0,
+    missing_boom = 0,
+}
+local _COLLISION_WARN_INTERVAL_SEC = 5.0
+
 -- Local helper logging functions to prefix messages with the module name and enforce level
 local function log_warn(message, once_key, cache)
     Logging.log_warn("Camera", message, once_key, cache)
@@ -80,6 +98,14 @@ local function safe_write(fn, context)
         log_warn((context or "Property write") .. " failed (object likely mid-destruction): " .. tostring(err), "safe_write_fail")
     end
     return ok
+end
+
+local function collision_warn_throttled(slot, message)
+    local now = os_clock()
+    local last = _collision_warn_last[slot] or 0
+    if (now - last) < _COLLISION_WARN_INTERVAL_SEC then return end
+    _collision_warn_last[slot] = now
+    log_warn(message)
 end
 
 -- ==================== Yaw reading ====================
@@ -144,6 +170,20 @@ local function clear_enforcement_caches()
     _enforce_miss_count = 0
 end
 
+local function cancel_lockon_exit_blend()
+    if M._lockon_exit_token then
+        CancelDelay(M._lockon_exit_token)
+        M._lockon_exit_token = nil
+    end
+    M._lockon_exit_active = false
+    M._lockon_exit_start_ms = nil
+    M._lockon_exit_duration_ms = nil
+    M._lockon_exit_from_pos = nil
+    M._lockon_exit_to_pos = nil
+    M._lockon_exit_from_fov = nil
+    M._lockon_exit_to_fov = nil
+end
+
 PlayerCtx.on_disable(function()
     if M._fov_transition_token then
         CancelDelay(M._fov_transition_token)
@@ -159,6 +199,7 @@ PlayerCtx.on_disable(function()
     _transition_busy = false
     _queued_transition = nil
 
+    cancel_lockon_exit_blend()
     clear_enforcement_caches()
 end)
 
@@ -231,6 +272,7 @@ function M.is_transitioning()
     return M._fov_transition_token ~= nil
         or M._cam_transition_token ~= nil
         or _transition_busy
+        or M._lockon_exit_active
 end
 
 -- ==================== FOV transition ====================
@@ -466,18 +508,18 @@ end
 function M.disable_camera_collision(flag)
     local s = PlayerCtx.get_snapshot()
     if not s then
-        log_warn("Camera collision toggle skipped because the snapshot is unavailable.", "collision_toggle_missing")
+        collision_warn_throttled("missing_snapshot", "Camera collision toggle skipped because the snapshot is unavailable.")
         return
     end
 
     ExecuteInGameThread(function()
         local snap = PlayerCtx.get_snapshot()
         if not snap then
-            log_warn("Camera collision toggle failed because the snapshot became invalid mid-thread.", "collision_toggle_midthread")
+            collision_warn_throttled("midthread_snapshot", "Camera collision toggle failed because the snapshot became invalid mid-thread.")
             return
         end
         if not obj_is_valid(snap.boom) then
-            log_warn("Camera collision toggle skipped because the boom component is unavailable.", "collision_toggle_missing_boom")
+            collision_warn_throttled("missing_boom", "Camera collision toggle skipped because the boom component is unavailable.")
             return
         end
         snap.boom.bDoCollisionTest = not flag
@@ -560,6 +602,163 @@ local function enf_validate_refs()
     return true
 end
 
+local function stop_enforcement_loop()
+    local was_active = (M._enforce_pos ~= nil or M._enforce_fov ~= nil or _enforce_token ~= nil)
+
+    M._enforce_pos        = nil
+    M._enforce_fov        = nil
+    M._enforce_yaw_bias   = 0
+    M._enforce_pitch_bias = 0
+    M._lockon_was_active = false
+
+    if _enforce_token then
+        CancelDelay(_enforce_token)
+        _enforce_token = nil
+    end
+
+    clear_enforcement_caches()
+    return was_active
+end
+
+function M.cancel_lockon_exit_blend()
+    cancel_lockon_exit_blend()
+end
+
+function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, duration_override)
+    if PlayerCtx.camera_or_pc_invalid() then
+        log_warn("Lock-on exit blend skipped because the camera context is unavailable.", "lockon_exit_invalid_context", true)
+        return false
+    end
+
+    local cfg = M._cfg or require("config").get()
+    local blend_seconds = (type(duration_override) == "number" and duration_override > 0) and duration_override or ((cfg and cfg.LockOnExitBlendTime) or 0.16)
+    local duration_ms = math_max(math_floor(blend_seconds * 1000), 20)
+
+    local snap = PlayerCtx.get_snapshot()
+    if not snap then
+        log_warn("Lock-on exit blend skipped because the camera snapshot is unavailable.", "lockon_exit_no_snapshot", true)
+        return false
+    end
+
+    local cam = snap.cam
+    if not obj_is_valid(cam) then
+        log_warn("Lock-on exit blend skipped because the camera component is invalid.", "lockon_exit_invalid_cam", true)
+        return false
+    end
+
+    local from_pos = nil
+    local loc = cam.RelativeLocation
+    if loc then
+        from_pos = { x = loc.X or 0, y = loc.Y or 0, z = loc.Z or 0 }
+    end
+
+    local from_fov = cam.ManualCameraFov
+    if from_fov == nil then
+        from_fov = (cfg and cfg.fovs and cfg.fovs.fov) or 75
+    end
+
+    local to_pos = nil
+    if target_position then
+        to_pos = { x = target_position.x or target_position.X or 0, y = target_position.y or target_position.Y or 0, z = target_position.z or target_position.Z or 0 }
+    end
+
+    local to_fov = target_fov
+    if to_fov == nil then
+        to_fov = (cfg and cfg.fovs and cfg.fovs.fov) or from_fov
+    end
+
+    if to_fov == nil and (not to_pos or (to_pos.x == 0 and to_pos.y == 0 and to_pos.z == 0)) then
+        log_warn("Lock-on exit blend skipped because there was no valid target FOV or position.", "lockon_exit_missing_target", true)
+        return false
+    end
+
+    if M._fov_transition_token then
+        CancelDelay(M._fov_transition_token)
+        M._fov_transition_token = nil
+    end
+    if M._cam_transition_token then
+        CancelDelay(M._cam_transition_token)
+        M._cam_transition_token = nil
+    end
+    M._active_target_fov = nil
+    M._active_target_position = nil
+    _transition_busy = false
+    _queued_transition = nil
+
+    cancel_lockon_exit_blend()
+    stop_enforcement_loop()
+
+    M._lockon_exit_active = true
+    M._lockon_exit_start_ms = now_ms()
+    M._lockon_exit_duration_ms = duration_ms
+    M._lockon_exit_from_pos = from_pos
+    M._lockon_exit_to_pos = to_pos
+    M._lockon_exit_from_fov = from_fov
+    M._lockon_exit_to_fov = to_fov
+
+    local function tick()
+        if PlayerCtx.camera_or_pc_invalid() then
+            cancel_lockon_exit_blend()
+            return
+        end
+
+        local snap_now = PlayerCtx.get_snapshot()
+        if not snap_now then
+            cancel_lockon_exit_blend()
+            return
+        end
+
+        local cam_now = snap_now.cam
+        if not obj_is_valid(cam_now) then
+            cancel_lockon_exit_blend()
+            return
+        end
+
+        local elapsed = now_ms() - (M._lockon_exit_start_ms or now_ms())
+        local dur = math_max(M._lockon_exit_duration_ms or duration_ms, 20)
+        local t = math_min(math_max(elapsed / dur, 0), 1)
+        local eased = quadratic(t, 0, 1, 1)
+
+        if M._lockon_exit_from_pos and M._lockon_exit_to_pos then
+            local loc_now = cam_now.RelativeLocation
+            if loc_now then
+                loc_now.X = (M._lockon_exit_from_pos.x or 0) + (M._lockon_exit_to_pos.x or 0 - (M._lockon_exit_from_pos.x or 0)) * eased
+                loc_now.Y = (M._lockon_exit_from_pos.y or 0) + (M._lockon_exit_to_pos.y or 0 - (M._lockon_exit_from_pos.y or 0)) * eased
+                loc_now.Z = (M._lockon_exit_from_pos.z or 0) + (M._lockon_exit_to_pos.z or 0 - (M._lockon_exit_from_pos.z or 0)) * eased
+            end
+        end
+
+        if M._lockon_exit_from_fov ~= nil and M._lockon_exit_to_fov ~= nil then
+            cam_now.bManualCameraFovMode = true
+            cam_now.ManualCameraFov = (M._lockon_exit_from_fov or 75) + (M._lockon_exit_to_fov - (M._lockon_exit_from_fov or 75)) * eased
+        end
+
+        if t < 1.0 then
+            M._lockon_exit_token = ExecuteWithDelay(8, tick)
+            return
+        end
+
+        if M._lockon_exit_from_pos and M._lockon_exit_to_pos then
+            local loc_now = cam_now.RelativeLocation
+            if loc_now then
+                loc_now.X = M._lockon_exit_to_pos.x or 0
+                loc_now.Y = M._lockon_exit_to_pos.y or 0
+                loc_now.Z = M._lockon_exit_to_pos.z or 0
+            end
+        end
+
+        if M._lockon_exit_from_fov ~= nil and M._lockon_exit_to_fov ~= nil then
+            cam_now.bManualCameraFovMode = true
+            cam_now.ManualCameraFov = M._lockon_exit_to_fov
+        end
+
+        cancel_lockon_exit_blend()
+    end
+
+    tick()
+    return true
+end
+
 function M.start_enforcement(pos, fov)
     if M._cam_transition_token then
         CancelDelay(M._cam_transition_token)
@@ -578,6 +777,9 @@ function M.start_enforcement(pos, fov)
 
     M._enforce_pos = pos and { x = pos.x or 0, y = pos.y or 0, z = pos.z or 0 } or nil
     M._enforce_fov = fov
+    M._lockon_was_active = true
+
+    M.cancel_lockon_exit_blend()
 
     -- Read biases from config
     local cfg = require("config").get()
@@ -608,13 +810,14 @@ function M.start_enforcement(pos, fov)
         _enforce_miss_count = 0
 
         -- ===== WRITE POSITION via TargetOffset (yaw-corrected) =====
-        if M._enforce_pos then
+        local enforce_pos = M._enforce_pos
+        if enforce_pos then
             local snap_for_yaw = { pc = PlayerCtx._pc, boom = _enf_boom, cam = _enf_cam }
             local sin_y, cos_y = get_yaw_sincos(snap_for_yaw)
 
-            local lateral = M._enforce_pos.x
-            local depth   = M._enforce_pos.y
-            local height  = M._enforce_pos.z
+            local lateral = enforce_pos.x or 0
+            local depth   = enforce_pos.y or 0
+            local height  = enforce_pos.z or 0
 
             local right_x = -sin_y
             local right_y =  cos_y
@@ -672,19 +875,7 @@ function M.start_enforcement(pos, fov)
 end
 
 function M.stop_enforcement()
-    local was_active = (M._enforce_pos ~= nil or M._enforce_fov ~= nil or _enforce_token ~= nil)
-
-    M._enforce_pos        = nil
-    M._enforce_fov        = nil
-    M._enforce_yaw_bias   = 0
-    M._enforce_pitch_bias = 0
-
-    if _enforce_token then
-        CancelDelay(_enforce_token)
-        _enforce_token = nil
-    end
-
-    clear_enforcement_caches()
+    local was_active = stop_enforcement_loop()
 
     if was_active then
         -- Force the restoration helper to run inside the thread worker

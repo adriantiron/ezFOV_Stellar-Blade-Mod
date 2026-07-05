@@ -27,6 +27,7 @@ local DEFAULTS = {
 
     FOVTransitionSteps    = 60,
     KeyFOVTransitionSteps = 20,
+    LockOnExitBlendTime   = 0.16,
 
     DisableCameraCollision = false,
     EnableIdleCamera       = true,
@@ -89,6 +90,7 @@ local function deep_copy_defaults()
 
         FOVTransitionSteps    = DEFAULTS.FOVTransitionSteps,
         KeyFOVTransitionSteps = DEFAULTS.KeyFOVTransitionSteps,
+        LockOnExitBlendTime   = DEFAULTS.LockOnExitBlendTime,
 
         DisableCameraCollision = DEFAULTS.DisableCameraCollision,
         EnableIdleCamera       = DEFAULTS.EnableIdleCamera,
@@ -115,9 +117,10 @@ local function load_file(path, container)
 		    -- Old greedy capture: if the new version doesn't work, use this
             -- local key, value = line:match("^%s*(%w+)%s*=%s*(.+)%s*$")
 			local key, value = line:match("^%s*(%w+)%s*=%s*(.-)%s*$")
-            if not key then goto continue end
-
-            if     key == "FOV"       then container.fovs.fov    = tonumber(value) or container.fovs.fov
+            if not key then
+                -- Skip blank or malformed lines safely.
+            elseif key == "FOV" then
+                container.fovs.fov = tonumber(value) or container.fovs.fov
             elseif key == "CombatFOV" then container.fovs.combat = tonumber(value) or container.fovs.combat
             elseif key == "TPSFOV"    then container.fovs.tps    = tonumber(value) or container.fovs.tps
             elseif key == "IdleFOV"   then container.fovs.idle   = tonumber(value) or container.fovs.idle
@@ -127,6 +130,9 @@ local function load_file(path, container)
 
             elseif key == "FOVTransitionSteps"    then container.FOVTransitionSteps    = tonumber(value) or container.FOVTransitionSteps
             elseif key == "KeyFOVTransitionSteps" then container.KeyFOVTransitionSteps = tonumber(value) or container.KeyFOVTransitionSteps
+            elseif key == "LockOnExitBlendTime" then
+                local n = tonumber(value)
+                if n then container.LockOnExitBlendTime = math.max(0.02, n) end
 
             elseif key == "DefaultCamX" then container.DefaultPosition.x = sanitize_number(value)
             elseif key == "DefaultCamY" then container.DefaultPosition.y = sanitize_number(value)
@@ -205,12 +211,6 @@ end
 local _save_timer = nil
 
 function M.write()
-    local cfg = M.get()
-    if not cfg or type(cfg) ~= "table" then
-        log_error("Config write aborted because the runtime config is invalid.", "config_write_missing_cfg", true)
-        return
-    end
-
     -- Cancel any pending save if the user presses a hotkey again within 200ms
     if _save_timer then CancelDelay(_save_timer) end
     
@@ -340,7 +340,8 @@ function M.write()
         f:write("SprintFOV=" .. tostring(cfg.fovs.sprint) .. "\n\n")
         f:write("; FOV Transition Smoothness (Higher numbers = slower, more cinematic pacing)\n")
         f:write("FOVTransitionSteps=" .. tostring(cfg.FOVTransitionSteps) .. "\n")
-        f:write("KeyFOVTransitionSteps=" .. tostring(cfg.KeyFOVTransitionSteps) .. "\n\n")
+        f:write("KeyFOVTransitionSteps=" .. tostring(cfg.KeyFOVTransitionSteps) .. "\n")
+        f:write("LockOnExitBlendTime=" .. tostring(cfg.LockOnExitBlendTime or DEFAULTS.LockOnExitBlendTime) .. "\n\n")
 
         f:write("; ---------------------------------------------------------------------------------\n")
         f:write("; FEATURE TOGGLES\n")
@@ -385,6 +386,7 @@ function M.save_preset(num)
     f:write("SprintFOV=" .. tostring(cfg.fovs.sprint) .. "\n")
     f:write("FOVTransitionSteps=" .. tostring(cfg.FOVTransitionSteps) .. "\n")
     f:write("KeyFOVTransitionSteps=" .. tostring(cfg.KeyFOVTransitionSteps) .. "\n")
+    f:write("LockOnExitBlendTime=" .. tostring(cfg.LockOnExitBlendTime or DEFAULTS.LockOnExitBlendTime) .. "\n")
     f:write("EnableIdleCamera=" .. tostring(cfg.EnableIdleCamera) .. "\n")
     f:write("EnableWalkingCamera=" .. tostring(cfg.EnableWalkingCamera) .. "\n")
     f:write("EnableSprintingCamera=" .. tostring(cfg.EnableSprintingCamera) .. "\n")
@@ -424,6 +426,7 @@ function M.load_preset(num)
     cfg.SprintPosition     = loaded.SprintPosition
     cfg.FOVTransitionSteps    = loaded.FOVTransitionSteps
     cfg.KeyFOVTransitionSteps = loaded.KeyFOVTransitionSteps
+    cfg.LockOnExitBlendTime   = loaded.LockOnExitBlendTime or cfg.LockOnExitBlendTime
     cfg.DisableCameraCollision = loaded.DisableCameraCollision
     cfg.EnableIdleCamera    = loaded.EnableIdleCamera
     cfg.EnableWalkingCamera    = loaded.EnableWalkingCamera

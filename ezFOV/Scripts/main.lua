@@ -76,8 +76,19 @@ RegisterKeyBindAsync(Key.F8, {}, function()
         if isLockOn and cfg.EnableLockOnCamera then
             Camera.start_enforcement(cfg.LockOnPosition, fov)
         else
-            Camera.set_fov_via_function(fov)
-            Camera.set_camera_relative_location(pos)
+            local should_blend_lockon_exit = Camera.is_enforcing and Camera.is_enforcing()
+            if should_blend_lockon_exit and Camera.begin_lockon_exit_blend then
+                local started = Camera.begin_lockon_exit_blend(pos, fov, nil, cfg.LockOnExitBlendTime)
+                if not started then
+                    if Camera.cancel_lockon_exit_blend then Camera.cancel_lockon_exit_blend() end
+                    Camera.set_fov_via_function(fov)
+                    Camera.set_camera_relative_location(pos)
+                end
+            else
+                if Camera.cancel_lockon_exit_blend then Camera.cancel_lockon_exit_blend() end
+                Camera.set_fov_via_function(fov)
+                Camera.set_camera_relative_location(pos)
+            end
         end
 
         Camera.disable_camera_collision(cfg.DisableCameraCollision)
@@ -249,8 +260,19 @@ local function apply_for_current_state()
     if isLockOn and cfg.EnableLockOnCamera then
         Camera.start_enforcement(cfg.LockOnPosition, fov)
     else
-        Camera.set_fov_via_function(fov, cfg.KeyFOVTransitionSteps)
-        Camera.set_camera_relative_location(pos, cfg.KeyFOVTransitionSteps)
+        local should_blend_lockon_exit = Camera.is_enforcing and Camera.is_enforcing()
+        if should_blend_lockon_exit and Camera.begin_lockon_exit_blend then
+            local started = Camera.begin_lockon_exit_blend(pos, fov, nil, cfg.LockOnExitBlendTime)
+            if not started then
+                if Camera.cancel_lockon_exit_blend then Camera.cancel_lockon_exit_blend() end
+                Camera.set_fov_via_function(fov, cfg.KeyFOVTransitionSteps)
+                Camera.set_camera_relative_location(pos, cfg.KeyFOVTransitionSteps)
+            end
+        else
+            if Camera.cancel_lockon_exit_blend then Camera.cancel_lockon_exit_blend() end
+            Camera.set_fov_via_function(fov, cfg.KeyFOVTransitionSteps)
+            Camera.set_camera_relative_location(pos, cfg.KeyFOVTransitionSteps)
+        end
     end
     Camera.disable_camera_collision(cfg.DisableCameraCollision)
 end
