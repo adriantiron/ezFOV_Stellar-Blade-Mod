@@ -142,14 +142,6 @@ local function apply_profile(profile, cfg)
     local prev = M._applied_profile
     M._applied_profile = profile
 
-    if prev == "lockon" then
-        if not Camera or not Camera.stop_enforcement then
-            log_error("Unable to leave lock-on mode because the camera module is unavailable.", "stance_missing_camera_stop", true)
-            return
-        end
-        Camera.stop_enforcement()
-    end
-
     if profile == "lockon" then
         if not Camera or not Camera.start_enforcement then
             log_error("Unable to enter lock-on mode because the camera module is unavailable.", "stance_missing_camera_start", true)
@@ -173,6 +165,31 @@ local function apply_profile(profile, cfg)
     -- 2. Slow down transitions IF we are exiting a traversal or resting state back to default/combat
     elseif profile == "default" and (prev == "walk" or prev == "sprint" or prev == "idle") then
         steps_override = slow_steps
+    end
+
+    if prev == "lockon" and Camera and Camera.begin_lockon_exit_blend then
+        local target_fov = fov_for_profile(profile, cfg)
+        local target_pos = nil
+        if     profile == "battle"  then target_pos = cfg.CombatPosition
+        elseif profile == "sprint"  then target_pos = cfg.SprintPosition
+        elseif profile == "idle"    then target_pos = cfg.IdlePosition
+        elseif profile == "walk"    then target_pos = cfg.WalkPosition
+        elseif profile == "default" then target_pos = cfg.DefaultPosition
+        end
+
+        ExecuteInGameThread(function()
+            local started = Camera.begin_lockon_exit_blend(target_pos, target_fov, nil, cfg.LockOnExitBlendTime)
+            if not started then
+                log_warn("Lock-on exit blend could not start; falling back to the standard transition path.", "lockon_exit_fallback", true)
+                if target_pos then
+                    Camera.set_camera_relative_location(target_pos, steps_override)
+                end
+                if target_fov ~= nil then
+                    Camera.set_fov_via_function(target_fov, steps_override)
+                end
+            end
+        end)
+        return
     end
 
     apply_position_for_profile(profile, cfg, steps_override)
@@ -199,27 +216,28 @@ function M.pulse()
 
     local state = {}
 
-    log_debug("Pulse state: starting TPS check", "pulse_tps_check", true)
+    -- Optional logging of the pulse state checks. Uncomment for debugging.
+    --log_debug("Pulse state: starting TPS check", "pulse_tps_check", true)
     state.tps = (safe_call(function() return PlayerCtx.is_tps_mode() end) == true)
 
-    log_debug("Pulse state: starting Lockon check", "pulse_lockon_check", true)
+    --log_debug("Pulse state: starting Lockon check", "pulse_lockon_check", true)
     state.lockon = (safe_call(function() return PlayerCtx.is_lock_on() end) == true)
 
-    log_debug("Pulse state: starting Battle check", "pulse_battle_check", true) -- If you see this, but not the next, is_battle is crashing
+    --log_debug("Pulse state: starting Battle check", "pulse_battle_check", true) -- If you see this, but not the next, is_battle is crashing
     state.battle = (safe_call(function() return PlayerCtx.is_battle() end) == true)
 
-    log_debug("Pulse state: starting Locomotion check", "pulse_locomotion_check", true)
+    --log_debug("Pulse state: starting Locomotion check", "pulse_locomotion_check", true)
     state.locomotion = safe_call(function()
         return PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state()
     end)
 
-    log_debug("Pulse state: gathered. Choosing profile...", "pulse_choose_profile", true)
+    --log_debug("Pulse state: gathered. Choosing profile...", "pulse_choose_profile", true)
     local profile = choose_profile(state, cfg)
 
-    log_debug("Pulse state: applying profile...", "pulse_apply_profile", true)
+    --log_debug("Pulse state: applying profile...", "pulse_apply_profile", true)
     apply_profile(profile, cfg)
 
-    log_debug("Pulse state: profile applied.", "pulse_profile_applied", true)
+    --log_debug("Pulse state: profile applied.", "pulse_profile_applied", true)
 
     if M._applied_profile == "lockon" then return end
 
