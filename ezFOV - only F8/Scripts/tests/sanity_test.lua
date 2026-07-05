@@ -1,7 +1,7 @@
-package.path = package.path .. ";./ezFOV/Scripts/?.lua;./ezFOV/Scripts/?/init.lua"
+package.path = package.path .. ";./ezFOV - only F8/Scripts/?.lua;./ezFOV - only F8/Scripts/?/init.lua"
 
 -- General pre-deploy sanity test:
--- 1) Parse-check every Lua file in ezFOV/Scripts
+-- 1) Parse-check every Lua file in ezFOV - only F8/Scripts
 -- 2) Smoke-load core modules with minimal safe stubs
 
 package.preload["UEHelpers"] = function()
@@ -14,14 +14,14 @@ local function assert_compiles(path)
 end
 
 local script_files = {
-	"./ezFOV/Scripts/logging.lua",
-	"./ezFOV/Scripts/heartbeat.lua",
-	"./ezFOV/Scripts/playercontext.lua",
-	"./ezFOV/Scripts/config.lua",
-	"./ezFOV/Scripts/camera.lua",
-	"./ezFOV/Scripts/stance.lua",
-	"./ezFOV/Scripts/hooks.lua",
-	"./ezFOV/Scripts/main.lua",
+	"./ezFOV - only F8/Scripts/logging.lua",
+	"./ezFOV - only F8/Scripts/heartbeat.lua",
+	"./ezFOV - only F8/Scripts/playercontext.lua",
+	"./ezFOV - only F8/Scripts/config.lua",
+	"./ezFOV - only F8/Scripts/camera.lua",
+	"./ezFOV - only F8/Scripts/stance.lua",
+	"./ezFOV - only F8/Scripts/hooks.lua",
+	"./ezFOV - only F8/Scripts/main.lua",
 }
 
 for _, path in ipairs(script_files) do
