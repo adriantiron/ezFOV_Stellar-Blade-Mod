@@ -33,6 +33,13 @@ local function _drop_caches()
     PlayerCtx._boom = nil
 end
 
+-- Helper functions to keep code DRY and ensure all child caches die with the pawn
+local function clear_pawn_caches()
+    PlayerCtx._pawn = nil
+    PlayerCtx._cam = nil
+    PlayerCtx._boom = nil
+end    
+
 local function _notify_disable()
     for i = 1, #PlayerCtx._on_disable do
         local ok, err = pcall(PlayerCtx._on_disable[i])
@@ -50,6 +57,13 @@ end
 local _lockon_fn    = nil
 local _lockon_tried = false
 local _lockon_pawn  = nil
+
+local function clear_lockon_caches()
+    _lockon_fn    = nil
+    _lockon_tried = false
+    _lockon_pawn  = nil
+end
+
 
 local _hb_enabled_prev  = Heartbeat.on_enabled
 local _hb_disabled_prev = Heartbeat.on_disabled
@@ -119,21 +133,42 @@ end
 
 function PlayerCtx.get_pawn()
     if PlayerCtx.is_disabled() then return nil end
-    if obj_is_valid(PlayerCtx._pawn) then return PlayerCtx._pawn end
 
     local pc = PlayerCtx.get_pc()
-    if not pc then
+    if not pc or not obj_is_valid(pc) then
         log_debug("get_pawn: no player controller yet", "pawn_no_pc", true)
+        PlayerCtx._pc = nil
+        clear_pawn_caches()
         return nil
     end
 
-    local ok, pawn = pcall(function() return pc.Pawn end)
-    if not ok or not obj_is_valid(pawn) then
-        log_debug("get_pawn: pawn not ready yet", "pawn_missing", true)
+    -- 1. Query the engine's absolute truth FIRST, safely.
+    local ok_engine, engine_pawn = pcall(function() return pc.Pawn end)
+    if not ok_engine or not engine_pawn then
+        clear_pawn_caches()
         return nil
     end
-    PlayerCtx._pawn = pawn
-    return pawn
+
+    -- 2. If the engine's pawn doesn't match our cache, our cache is stale/dead.
+    -- We never dereference the old cached pawn here; we only compare the raw pointer identity.
+    if PlayerCtx._pawn ~= engine_pawn then
+        log_debug("get_pawn: pawn reference changed; updating cache", "pawn_changed", true)
+        PlayerCtx._pawn = engine_pawn
+        -- Only clear child components so they fetch fresh from the new pawn next time
+        PlayerCtx._cam = nil
+        PlayerCtx._boom = nil
+        clear_lockon_caches()
+    end
+
+    -- 3. Only after the pointer has been updated do we validate the new object.
+    if not obj_is_valid(PlayerCtx._pawn) then
+        log_debug("get_pawn: engine pawn invalid", "pawn_missing", true)
+        clear_pawn_caches()
+        clear_lockon_caches()
+        return nil
+    end
+
+    return PlayerCtx._pawn
 end
 
 function PlayerCtx.get_camera()
