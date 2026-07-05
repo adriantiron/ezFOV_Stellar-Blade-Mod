@@ -49,6 +49,7 @@ end
 
 local _lockon_fn    = nil
 local _lockon_tried = false
+local _lockon_pawn  = nil
 
 local _hb_enabled_prev  = Heartbeat.on_enabled
 local _hb_disabled_prev = Heartbeat.on_disabled
@@ -100,6 +101,7 @@ function PlayerCtx.clear_caches()
     _drop_caches()
     _lockon_fn    = nil
     _lockon_tried = false
+    _lockon_pawn  = nil
 end
 
 function PlayerCtx.get_pc()
@@ -193,7 +195,18 @@ end
 function PlayerCtx.is_lock_on()
     if Heartbeat.is_disabled() then return nil end
     local pawn = PlayerCtx.get_pawn()
-    if not obj_is_valid(pawn) then return nil end
+    if not obj_is_valid(pawn) then
+        _lockon_fn    = nil
+        _lockon_tried = false
+        _lockon_pawn  = nil
+        return nil
+    end
+
+    if _lockon_pawn ~= pawn then
+        _lockon_fn    = nil
+        _lockon_tried = false
+        _lockon_pawn  = pawn
+    end
 
     if _lockon_fn then
         local ok, result = pcall(_lockon_fn, pawn)
@@ -238,6 +251,8 @@ function PlayerCtx.is_lock_on()
         return _lockon_fn(pawn)
     end
 
+    _lockon_fn    = nil
+    _lockon_tried = false
     log_warn("No lock-on detection method found!", "lockon_detect_none")
     return nil
 end
