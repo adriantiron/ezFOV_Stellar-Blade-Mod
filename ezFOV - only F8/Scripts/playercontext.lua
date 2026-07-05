@@ -231,9 +231,7 @@ function PlayerCtx.is_lock_on()
     if Heartbeat.is_disabled() then return nil end
     local pawn = PlayerCtx.get_pawn()
     if not obj_is_valid(pawn) then
-        _lockon_fn    = nil
-        _lockon_tried = false
-        _lockon_pawn  = nil
+        clear_lockon_caches()
         return nil
     end
 
@@ -256,7 +254,7 @@ function PlayerCtx.is_lock_on()
     local ok_bl, val_bl = pcall(function() return pawn.bLockOn end)
     if ok_bl and type(val_bl) == "boolean" then
         _lockon_fn = function(p) return p.bLockOn end
-        log_debug("Lock-on detection: using bLockOn property", "lockon_detect_bLockOn")
+        log_debug("Lock-on detection: using bLockOn property", "lockon_detect_bLockOn", true)
         return val_bl
     end
 
@@ -366,15 +364,14 @@ function PlayerCtx.get_snapshot()
     if Heartbeat.is_disabled() then return nil end
     if PlayerCtx._disabled      then return nil end
 
-    if not PlayerCtx.ensure_ready(true) then return nil end
+    if not PlayerCtx.ensure_ready(false) then return nil end
 
     local pc   = PlayerCtx._pc
     local pawn = PlayerCtx._pawn
     local cam  = PlayerCtx._cam
     local boom = PlayerCtx._boom
 
-    if not (obj_is_valid(pc) and obj_is_valid(pawn)
-            and obj_is_valid(cam) and obj_is_valid(boom)) then
+    if not (obj_is_valid(pc) and obj_is_valid(pawn) and obj_is_valid(cam)) then
         return nil
     end
 

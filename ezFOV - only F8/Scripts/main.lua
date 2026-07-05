@@ -45,6 +45,7 @@ RegisterKeyBindAsync(Key.F8, {}, function()
     end
 
     cfg = reloaded_cfg
+    if Stance.reset_state then Stance.reset_state() end
     Camera.init(cfg) -- Keep camera's internal reference perfectly synchronized
 
     ExecuteInGameThread(function()

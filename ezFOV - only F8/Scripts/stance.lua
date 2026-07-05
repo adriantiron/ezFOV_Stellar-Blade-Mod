@@ -183,6 +183,11 @@ function M.get_current_profile()
     return M._applied_profile or "default"
 end
 
+function M.reset_state()
+    M._applied_profile = nil
+    M._applied_fov = nil
+end
+
 function M.pulse()
     if not ready() then return end
 
