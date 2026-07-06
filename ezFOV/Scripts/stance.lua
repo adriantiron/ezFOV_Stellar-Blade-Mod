@@ -160,9 +160,6 @@ local function apply_profile(profile, cfg)
         local fov = fov_for_profile("lockon", cfg)
         M._applied_fov = fov
         Camera.start_enforcement(cfg.LockOnPosition, fov)
-        log_debug(string.format("-> lockon FOV=%.0f Pos=(%.0f,%.0f,%.0f) YawBias=%.1f PitchBias=%.1f",
-            fov, cfg.LockOnPosition.x or 0, cfg.LockOnPosition.y or 0, cfg.LockOnPosition.z or 0,
-            cfg.LockOnYawBias or 0, cfg.LockOnPitchBias or 0), "lockon_profile_applied")
         return
     end
 
