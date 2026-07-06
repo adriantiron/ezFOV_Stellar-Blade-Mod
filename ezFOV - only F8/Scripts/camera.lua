@@ -361,11 +361,6 @@ function M.set_fov_via_function(target_fov, overrideSteps)
         end
     end
 
-    log_debug(string.format(
-        "Transition start: fov target=%.2f, steps=%d (interpolation samples), step_delay_ms=1",
-        target_fov or 0,
-        steps
-    ), "fov_transition_start")
     Env.run_now("fov_transition_start", tick)
 end
 
@@ -541,15 +536,6 @@ function M.set_camera_relative_location(target_position, overrideSteps)
         return
     end
 
-    log_debug(string.format(
-        "Transition start: camera pos=(%.2f,%.2f,%.2f), duration_ms=%.0f (total blend time), steps_units=%d, unit_ms=%d",
-        to.x or 0,
-        to.y or 0,
-        to.z or 0,
-        duration_ms or 0,
-        steps_units or 0,
-        unit or 0
-    ), "camera_transition_start")
     Env.run_now("camera_transition_start", tick)
 end
 
@@ -841,12 +827,6 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
         cancel_lockon_exit_blend()
     end
 
-    log_debug(string.format(
-        "Transition start: lockon_exit target_fov=%s, duration_ms=%.0f (total blend time), duration_s=%.3f",
-        tostring(to_fov),
-        duration_ms or 0,
-        (duration_ms or 0) / 1000.0
-    ), "lockon_exit_start")
     Env.run_now("lockon_exit_start", tick)
     return true
 end
@@ -979,14 +959,6 @@ function M.start_enforcement(pos, fov)
 
         _enforce_token = Env.run_after_delay(_ENFORCE_TICK_MS, "lockon_enforce_tick", loop)
     end
-
-    log_debug(string.format("Enforcement started with Pos=(%.1f,%.1f,%.1f) FOV=%s YawBias=%.1f PitchBias=%.1f",
-        M._enforce_pos and M._enforce_pos.x or 0,
-        M._enforce_pos and M._enforce_pos.y or 0,
-        M._enforce_pos and M._enforce_pos.z or 0,
-        tostring(M._enforce_fov or "—"),
-        M._enforce_yaw_bias or 0,
-        M._enforce_pitch_bias or 0), "enforce_start")
 
     Env.run_now("lockon_enforce_start", loop)
 end

@@ -31,6 +31,49 @@ if not cfg then
     return
 end
 
+log_debug(string.format(
+    "Initial config: FOV(default=%.0f,fov=%.0f,combat=%.0f,tps=%.0f,idle=%.0f,walk=%.0f,sprint=%.0f,lockon=%.0f) " ..
+    "Pos(default=(%.0f,%.0f,%.0f),combat=(%.0f,%.0f,%.0f),lockon=(%.0f,%.0f,%.0f),idle=(%.0f,%.0f,%.0f),walk=(%.0f,%.0f,%.0f),sprint=(%.0f,%.0f,%.0f)) " ..
+    "flags(lockon=%s,idle=%s,walk=%s,sprint=%s,collision=%s) " ..
+    "bias(yaw=%.1f,pitch=%.1f) exit_blend=%.3f steps(fov=%d,key=%d)",
+    cfg.fovs.default or 0,
+    cfg.fovs.fov or 0,
+    cfg.fovs.combat or 0,
+    cfg.fovs.tps or 0,
+    cfg.fovs.idle or 0,
+    cfg.fovs.walk or 0,
+    cfg.fovs.sprint or 0,
+    cfg.fovs.lockon or 0,
+    cfg.DefaultPosition.x or 0,
+    cfg.DefaultPosition.y or 0,
+    cfg.DefaultPosition.z or 0,
+    cfg.CombatPosition.x or 0,
+    cfg.CombatPosition.y or 0,
+    cfg.CombatPosition.z or 0,
+    cfg.LockOnPosition.x or 0,
+    cfg.LockOnPosition.y or 0,
+    cfg.LockOnPosition.z or 0,
+    cfg.IdlePosition.x or 0,
+    cfg.IdlePosition.y or 0,
+    cfg.IdlePosition.z or 0,
+    cfg.WalkPosition.x or 0,
+    cfg.WalkPosition.y or 0,
+    cfg.WalkPosition.z or 0,
+    cfg.SprintPosition.x or 0,
+    cfg.SprintPosition.y or 0,
+    cfg.SprintPosition.z or 0,
+    tostring(cfg.EnableLockOnCamera),
+    tostring(cfg.EnableIdleCamera),
+    tostring(cfg.EnableWalkingCamera),
+    tostring(cfg.EnableSprintingCamera),
+    tostring(cfg.DisableCameraCollision),
+    cfg.LockOnYawBias or 0,
+    cfg.LockOnPitchBias or 0,
+    cfg.LockOnExitBlendTime or 0,
+    cfg.FOVTransitionSteps or 0,
+    cfg.KeyFOVTransitionSteps or 0
+), "config_initial_state", true)
+
 local ok_init, init_err = pcall(function()
     Camera.init(cfg)
     Camera.disable_camera_collision(cfg.DisableCameraCollision)
