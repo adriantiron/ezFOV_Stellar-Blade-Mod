@@ -12,6 +12,7 @@ local Env = {
 }
 
 local debug_traceback = debug and debug.traceback
+local _immediate_traceback_enabled = true
 
 local function log_error(component, message, once_key)
     Logging.log_error(component, message, once_key)
@@ -25,14 +26,27 @@ local function format_error_with_trace(err)
 end
 
 local function run_guarded(component, context, kind, fn)
-    local ok, err = xpcall(fn, function(e)
-        return format_error_with_trace(e)
-    end)
+    local ok, err
+    if kind == "immediate" and not _immediate_traceback_enabled then
+        ok, err = pcall(fn)
+    else
+        ok, err = xpcall(fn, function(e)
+            return format_error_with_trace(e)
+        end)
+    end
     if not ok then
         log_error(component, context .. " failed: " .. tostring(err), context .. "_" .. kind .. "_error")
         return false
     end
     return true
+end
+
+function Env.set_immediate_traceback_enabled(enabled)
+    _immediate_traceback_enabled = (enabled ~= false)
+end
+
+function Env.is_immediate_traceback_enabled()
+    return _immediate_traceback_enabled
 end
 
 function Env.run_now(component, context, fn)
@@ -143,6 +157,12 @@ function Env.bind(component)
         end,
         run_now = function(context, fn)
             return Env.run_now(scope, context, fn)
+        end,
+        set_immediate_traceback_enabled = function(enabled)
+            Env.set_immediate_traceback_enabled(enabled)
+        end,
+        is_immediate_traceback_enabled = function()
+            return Env.is_immediate_traceback_enabled()
         end,
         register_safe_keybind = function(key, modifiers, label, fn)
             return Env.register_safe_keybind(scope, key, modifiers, label, fn)
