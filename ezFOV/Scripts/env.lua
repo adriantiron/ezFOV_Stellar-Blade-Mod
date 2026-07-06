@@ -43,12 +43,16 @@ function Env.run_on_game_thread(component, context, fn)
     local execute = Env.ExecuteInGameThread
     if type(execute) ~= "function" then
         log_error(component, context .. " failed because ExecuteInGameThread is unavailable.", context .. "_missing_thread_api")
-        return
+        return false
     end
 
-    execute(function()
-        run_guarded(component, context, "thread", fn)
+    local scheduled = run_guarded(component, context .. "_dispatch", "thread", function()
+        execute(function()
+            run_guarded(component, context, "thread", fn)
+        end)
     end)
+
+    return scheduled
 end
 
 function Env.run_after_delay(component, delay_ms, context, fn)
