@@ -1,6 +1,7 @@
 local M = {}
 
 local _log_once_cache = {}
+local _warn_cache_enabled = true
 local _debug_cache_enabled = true
 
 local function normalize_component(component)
@@ -12,8 +13,8 @@ function M.log_message(component, level, message, once_key, cache)
     local lvl = tostring(level or "INFO")
     local should_cache = cache == true and once_key ~= nil
 
-    
-    if lvl == "ERROR" then
+    -- Warn cache can be disabled at runtime for deeper troubleshooting sessions.
+    if lvl == "WARN" and not _warn_cache_enabled then
         should_cache = false
     end
 
@@ -54,6 +55,14 @@ end
 
 function M.is_debug_cache_enabled()
     return _debug_cache_enabled
+end
+
+function M.set_warn_cache_enabled(enabled)
+    _warn_cache_enabled = (enabled ~= false)
+end
+
+function M.is_warn_cache_enabled()
+    return _warn_cache_enabled
 end
 
 return M

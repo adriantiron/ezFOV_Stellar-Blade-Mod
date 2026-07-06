@@ -13,12 +13,12 @@ local PlayerCtx = {
 }
 
 -- Local helper logging functions to prefix messages with the module name and enforce level
-local function log_warn(message, once_key, cache)
-    Logging.log_warn("PlayerCtx", message, once_key, cache)
+local function log_error(message, once_key)
+    Logging.log_error("PlayerCtx", message, once_key)
 end
 
-local function log_error(message, once_key, cache)
-    Logging.log_error("PlayerCtx", message, once_key, cache)
+local function log_warn(message, once_key, cache)
+    Logging.log_warn("PlayerCtx", message, once_key, cache)
 end
 
 local function log_debug(message, once_key, cache)
@@ -145,6 +145,13 @@ function PlayerCtx.get_pawn()
     -- 1. Query the engine's absolute truth FIRST, safely.
     local ok_engine, engine_pawn = pcall(function() return pc.Pawn end)
     if not ok_engine or not engine_pawn then
+        if not ok_engine then
+            log_warn(
+                "get_pawn: failed to read pc.Pawn; clearing pawn caches. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
+                "pawn_read_failed",
+                true
+            )
+        end
         clear_pawn_caches()
         return nil
     end
@@ -215,6 +222,11 @@ function PlayerCtx.is_tps_mode()
     if not obj_is_valid(pawn) then return nil end
     local ok, result = pcall(function() return pawn:IsTPSMode() end)
     if ok then return result end
+    log_warn(
+        "is_tps_mode: engine call failed while reading TPS state. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
+        "tps_mode_read_failed",
+        true
+    )
     return nil
 end
 
@@ -224,6 +236,11 @@ function PlayerCtx.is_battle()
     if not obj_is_valid(pawn) then return nil end
     local ok, result = pcall(function() return pawn:IsBattle() end)
     if ok then return result end
+    log_warn(
+        "is_battle: engine call failed while reading battle state. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
+        "battle_state_read_failed",
+        true
+    )
     return nil
 end
 
@@ -244,6 +261,11 @@ function PlayerCtx.is_lock_on()
     if _lockon_fn then
         local ok, result = pcall(_lockon_fn, pawn)
         if ok then return result end
+        log_warn(
+            "is_lock_on: cached lock-on probe failed; retrying method discovery. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
+            "lockon_probe_failed",
+            true
+        )
         _lockon_fn    = nil
         _lockon_tried = false
     end
@@ -321,11 +343,25 @@ function PlayerCtx.get_locomotion_state()
 
     local ok_cm, cm = pcall(function() return pawn.CharacterMovement end)
     if not ok_cm or not cm or (not obj_is_valid(cm)) then
+        if not ok_cm then
+            log_warn(
+                "get_locomotion_state: failed to read CharacterMovement. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
+                "loco_character_movement_read_failed",
+                true
+            )
+        end
         return _loco.last_state
     end
 
     local ok_v, v = pcall(function() return cm.Velocity end)
     if not ok_v or not v then
+        if not ok_v then
+            log_warn(
+                "get_locomotion_state: failed to read movement velocity. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
+                "loco_velocity_read_failed",
+                true
+            )
+        end
         return _loco.last_state
     end
 
