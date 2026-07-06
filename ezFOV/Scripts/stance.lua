@@ -38,8 +38,11 @@ local _LOCKON_EXIT_GRACE = 0.4
 local _grace_logged      = false
 local _ready_warned      = false
 
-local function safe_call(fn)
-    local ok, r = pcall(fn)
+local function safe_call(fn, context)
+    local r = nil
+    local ok = Env.run_now(context or "stance_safe_call", function()
+        r = fn()
+    end)
     if ok then return r end
     return nil
 end
@@ -227,37 +230,58 @@ function M.pulse()
 
     local state = {}
 
-    -- Optional logging of the pulse state checks. Uncomment for debugging.
-    --log_debug("Pulse state: starting TPS check", "pulse_tps_check", true)
-    state.tps = (safe_call(function() return PlayerCtx.is_tps_mode() end) == true)
+    state.tps = (safe_call(function() return PlayerCtx.is_tps_mode() end, "pulse_tps_eval") == true)
 
-    --log_debug("Pulse state: starting Lockon check", "pulse_lockon_check", true)
-    state.lockon = (safe_call(function() return PlayerCtx.is_lock_on() end) == true)
+    state.lockon = (safe_call(function() return PlayerCtx.is_lock_on() end, "pulse_lockon_eval") == true)
 
-    --log_debug("Pulse state: starting Battle check", "pulse_battle_check", true) -- If you see this, but not the next, is_battle is crashing
-    state.battle = (safe_call(function() return PlayerCtx.is_battle() end) == true)
+    state.battle = (safe_call(function() return PlayerCtx.is_battle() end, "pulse_battle_eval") == true)
 
-    --log_debug("Pulse state: starting Locomotion check", "pulse_locomotion_check", true)
     state.locomotion = safe_call(function()
         return PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state()
-    end)
+    end, "pulse_locomotion_eval")
 
-    --log_debug("Pulse state: gathered. Choosing profile...", "pulse_choose_profile", true)
     local profile = choose_profile(state, cfg)
 
-    --log_debug("Pulse state: applying profile...", "pulse_apply_profile", true)
     apply_profile(profile, cfg)
 
-    --log_debug("Pulse state: profile applied.", "pulse_profile_applied", true)
+    if M._applied_profile == "lockon" then
+        return
+    end
 
-    if M._applied_profile == "lockon" then return end
+    local transitioning = false
+    if Camera and Camera.is_transitioning then
+        local transition_state = nil
+        local ok_transition = Env.run_now("pulse_post_transition_eval", function()
+            transition_state = Camera.is_transitioning()
+        end)
+        if not ok_transition then
+            return
+        end
+        transitioning = (transition_state == true)
+    else
+        log_warn("Pulse post-apply is missing Camera.is_transitioning; skipping transition-aware enforcement.", "pulse_missing_transition_fn", true)
+        return
+    end
 
-    if Camera.is_transitioning and not Camera.is_transitioning() then
-        local target = fov_for_profile(M._applied_profile, cfg)
-        if target then
+    if not transitioning then
+        local target_or_err = nil
+        local ok_target = Env.run_now("pulse_post_target_fov_eval", function()
+            target_or_err = fov_for_profile(M._applied_profile, cfg)
+        end)
+        if not ok_target then
+            return
+        end
+
+        if target_or_err ~= nil then
             Env.run_on_game_thread("stance_enforce_fov", function()
-                Camera.enforce_fov(target)
+                if not Camera or type(Camera.enforce_fov) ~= "function" then
+                    log_error("Pulse post-apply cannot enforce FOV because Camera.enforce_fov is unavailable.", "pulse_missing_enforce_fov")
+                    return
+                end
+                Camera.enforce_fov(target_or_err)
             end)
+        else
+            log_warn("Pulse post-apply resolved a nil target FOV; skipping enforcement.", "pulse_post_nil_target", true)
         end
     end
 end
