@@ -6,7 +6,7 @@ local format = string.format
 local M = {}
 
 local DEFAULTS = {
-    path = "UE4SS/Mods/ezFOV - only F8/ezFOV.cfg",
+    path = "UE4SS/Mods/ezFOV_onlyF8/ezFOV.cfg",
 
     fovs = {
         default = 75,
