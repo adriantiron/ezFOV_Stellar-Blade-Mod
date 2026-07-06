@@ -1,4 +1,5 @@
 local UEHelpers = require("UEHelpers")
+local Env = require("env").bind("Camera")
 local PlayerCtx = require("playercontext")
 local Logging   = require("logging")
 
@@ -84,6 +85,7 @@ local function log_debug(message, once_key, cache)
     Logging.log_debug("Camera", message, once_key, cache)
 end
 -- ========================================================================================
+
 
 local function obj_is_valid(obj)
     if not obj then return false end
@@ -172,7 +174,7 @@ end
 
 local function cancel_lockon_exit_blend()
     if M._lockon_exit_token then
-        CancelDelay(M._lockon_exit_token)
+        Env.CancelDelay(M._lockon_exit_token)
         M._lockon_exit_token = nil
     end
     M._lockon_exit_active = false
@@ -186,13 +188,13 @@ end
 
 PlayerCtx.on_disable(function()
     if M._fov_transition_token then
-        CancelDelay(M._fov_transition_token)
+        Env.CancelDelay(M._fov_transition_token)
         M._fov_transition_token = nil
     end
     M._active_target_fov = nil
 
     if M._cam_transition_token then
-        CancelDelay(M._cam_transition_token)
+        Env.CancelDelay(M._cam_transition_token)
         M._cam_transition_token = nil
     end
     M._active_target_position = nil
@@ -296,7 +298,7 @@ function M.set_fov_via_function(target_fov, overrideSteps)
     end
 
     if M._fov_transition_token then
-        CancelDelay(M._fov_transition_token)
+        Env.CancelDelay(M._fov_transition_token)
         M._fov_transition_token = nil
     end
     M._active_target_fov = target_fov
@@ -304,7 +306,9 @@ function M.set_fov_via_function(target_fov, overrideSteps)
     local cfg_steps = (M._cfg and M._cfg.FOVTransitionSteps) or 20
     local steps = overrideSteps or math_max(cfg_steps, 10)
     local step = 0
-    local current_fov = cam.ManualCameraFov or 75
+    ---@type any
+    local cam_any = cam
+    local current_fov = cam_any.ManualCameraFov or 75
 
     local function tick()
         if PlayerCtx.camera_or_pc_invalid() then
@@ -324,7 +328,7 @@ function M.set_fov_via_function(target_fov, overrideSteps)
             cam.bManualCameraFovMode = true
             cam.ManualCameraFov = eased
             step = step + 1
-            M._fov_transition_token = ExecuteWithDelay(1, tick)
+            M._fov_transition_token = Env.run_after_delay(1, "fov_transition", tick)
         else
             M._fov_transition_token = nil
             M._active_target_fov = nil
@@ -393,7 +397,7 @@ function M.set_camera_relative_location(target_position, overrideSteps)
     end
 
     if M._cam_transition_token then
-        CancelDelay(M._cam_transition_token)
+        Env.CancelDelay(M._cam_transition_token)
         M._cam_transition_token = nil
     end
 
@@ -456,12 +460,12 @@ function M.set_camera_relative_location(target_position, overrideSteps)
         l.Z = eased.z
 
         if t < 1.0 then
-            M._cam_transition_token = ExecuteWithDelay(1, tick)
+            M._cam_transition_token = Env.run_after_delay(1, "camera_transition", tick)
             return
         end
 
         local settle = math_max((M._active_duration_ms or duration_ms) + 20, 100)
-        M._cam_transition_token = ExecuteWithDelay(settle, function()
+        M._cam_transition_token = Env.run_after_delay(settle, "camera_transition_settle", function()
             if PlayerCtx.camera_or_pc_invalid() then finish(); return end
 
             local s2 = PlayerCtx.get_snapshot()
@@ -486,7 +490,7 @@ function M.set_camera_relative_location(target_position, overrideSteps)
                     log_warn(string.format("Camera position interpolation drifted beyond safe bounds (dx:%.1f, dy:%.1f, dz:%.1f); re-syncing from the current camera state.", dx, dy, dz), "camera_transition_drift")
                     
                     restart_from_current()
-                    M._cam_transition_token = ExecuteWithDelay(1, tick)
+                    M._cam_transition_token = Env.run_after_delay(1, "camera_transition_recover", tick)
                     return
                 end
             end
@@ -512,7 +516,7 @@ function M.disable_camera_collision(flag)
         return
     end
 
-    ExecuteInGameThread(function()
+    Env.run_on_game_thread("disable_camera_collision", function()
         local snap = PlayerCtx.get_snapshot()
         if not snap then
             collision_warn_throttled("midthread_snapshot", "Camera collision toggle failed because the snapshot became invalid mid-thread.")
@@ -538,11 +542,11 @@ function M.init(cfg)
     M._already_initialized = true
     M._cfg = cfg
 
-    ExecuteInGameThread(function()
+    Env.run_on_game_thread("camera_init_set_fov", function()
         M.set_fov_via_function(cfg.fovs.fov)
     end)
 
-    ExecuteInGameThread(function()
+    Env.run_on_game_thread("camera_init_set_position", function()
         M.set_camera_relative_location(cfg.DefaultPosition)
     end)
 end
@@ -569,7 +573,9 @@ function M.enforce_fov(target_fov)
         return
     end
 
-    local actual = cam.ManualCameraFov
+    ---@type any
+    local cam_any = cam
+    local actual = cam_any.ManualCameraFov
     if actual == nil then return end
 
     if math_abs(actual - target_fov) > 0.5 then
@@ -612,7 +618,7 @@ local function stop_enforcement_loop()
     M._lockon_was_active = false
 
     if _enforce_token then
-        CancelDelay(_enforce_token)
+        Env.CancelDelay(_enforce_token)
         _enforce_token = nil
     end
 
@@ -647,12 +653,16 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
     end
 
     local from_pos = nil
-    local loc = cam.RelativeLocation
+    ---@type any
+    local cam_any = cam
+    local loc = cam_any.RelativeLocation
     if loc then
         from_pos = { x = loc.X or 0, y = loc.Y or 0, z = loc.Z or 0 }
     end
 
-    local from_fov = cam.ManualCameraFov
+    ---@type any
+    local cam_any = cam
+    local from_fov = cam_any.ManualCameraFov
     if from_fov == nil then
         from_fov = (cfg and cfg.fovs and cfg.fovs.fov) or 75
     end
@@ -673,11 +683,11 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
     end
 
     if M._fov_transition_token then
-        CancelDelay(M._fov_transition_token)
+        Env.CancelDelay(M._fov_transition_token)
         M._fov_transition_token = nil
     end
     if M._cam_transition_token then
-        CancelDelay(M._cam_transition_token)
+        Env.CancelDelay(M._cam_transition_token)
         M._cam_transition_token = nil
     end
     M._active_target_fov = nil
@@ -720,11 +730,13 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
         local eased = quadratic(t, 0, 1, 1)
 
         if M._lockon_exit_from_pos and M._lockon_exit_to_pos then
-            local loc_now = cam_now.RelativeLocation
+            ---@type any
+            local cam_now_any = cam_now
+            local loc_now = cam_now_any.RelativeLocation
             if loc_now then
-                loc_now.X = (M._lockon_exit_from_pos.x or 0) + (M._lockon_exit_to_pos.x or 0 - (M._lockon_exit_from_pos.x or 0)) * eased
-                loc_now.Y = (M._lockon_exit_from_pos.y or 0) + (M._lockon_exit_to_pos.y or 0 - (M._lockon_exit_from_pos.y or 0)) * eased
-                loc_now.Z = (M._lockon_exit_from_pos.z or 0) + (M._lockon_exit_to_pos.z or 0 - (M._lockon_exit_from_pos.z or 0)) * eased
+                loc_now.X = (M._lockon_exit_from_pos.x or 0) + ((M._lockon_exit_to_pos.x or 0) - (M._lockon_exit_from_pos.x or 0)) * eased
+                loc_now.Y = (M._lockon_exit_from_pos.y or 0) + ((M._lockon_exit_to_pos.y or 0) - (M._lockon_exit_from_pos.y or 0)) * eased
+                loc_now.Z = (M._lockon_exit_from_pos.z or 0) + ((M._lockon_exit_to_pos.z or 0) - (M._lockon_exit_from_pos.z or 0)) * eased
             end
         end
 
@@ -734,12 +746,14 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
         end
 
         if t < 1.0 then
-            M._lockon_exit_token = ExecuteWithDelay(8, tick)
+            M._lockon_exit_token = Env.run_after_delay(8, "lockon_exit_blend", tick)
             return
         end
 
         if M._lockon_exit_from_pos and M._lockon_exit_to_pos then
-            local loc_now = cam_now.RelativeLocation
+            ---@type any
+            local cam_now_any = cam_now
+            local loc_now = cam_now_any.RelativeLocation
             if loc_now then
                 loc_now.X = M._lockon_exit_to_pos.x or 0
                 loc_now.Y = M._lockon_exit_to_pos.y or 0
@@ -761,11 +775,11 @@ end
 
 function M.start_enforcement(pos, fov)
     if M._cam_transition_token then
-        CancelDelay(M._cam_transition_token)
+        Env.CancelDelay(M._cam_transition_token)
         M._cam_transition_token = nil
     end
     if M._fov_transition_token then
-        CancelDelay(M._fov_transition_token)
+        Env.CancelDelay(M._fov_transition_token)
         M._fov_transition_token = nil
     end
     
@@ -803,7 +817,7 @@ function M.start_enforcement(pos, fov)
 
         if not enf_validate_refs() then
             _enforce_miss_count = math_min(_enforce_miss_count + 1, 4)
-            _enforce_token = ExecuteWithDelay(_ENFORCE_RETRY_MS * _enforce_miss_count, loop)
+            _enforce_token = Env.run_after_delay(_ENFORCE_RETRY_MS * _enforce_miss_count, "lockon_enforce_retry", loop)
             return
         end
 
@@ -841,7 +855,9 @@ function M.start_enforcement(pos, fov)
         local has_yaw   = M._enforce_yaw_bias   and M._enforce_yaw_bias   ~= 0
         local has_pitch = M._enforce_pitch_bias and M._enforce_pitch_bias ~= 0
         if has_yaw or has_pitch then
-            local rel_rot = obj_is_valid(_enf_cam) and _enf_cam.RelativeRotation or nil
+            ---@type any
+            local enf_cam_any = _enf_cam
+            local rel_rot = obj_is_valid(enf_cam_any) and enf_cam_any.RelativeRotation or nil
             if rel_rot then
                 if has_yaw then
                     rel_rot.Yaw = M._enforce_yaw_bias
@@ -856,11 +872,13 @@ function M.start_enforcement(pos, fov)
 
         -- ===== FOV =====
         if M._enforce_fov then
-            _enf_cam.bManualCameraFovMode = true
-            _enf_cam.ManualCameraFov = M._enforce_fov
+            ---@type any
+            local enf_cam_any = _enf_cam
+            enf_cam_any.bManualCameraFovMode = true
+            enf_cam_any.ManualCameraFov = M._enforce_fov
         end
 
-        _enforce_token = ExecuteWithDelay(_ENFORCE_TICK_MS, loop)
+        _enforce_token = Env.run_after_delay(_ENFORCE_TICK_MS, "lockon_enforce_tick", loop)
     end
 
     log_debug(string.format("Enforcement started with Pos=(%.1f,%.1f,%.1f) FOV=%s YawBias=%.1f PitchBias=%.1f",

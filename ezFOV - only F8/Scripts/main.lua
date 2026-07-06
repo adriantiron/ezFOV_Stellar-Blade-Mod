@@ -1,5 +1,6 @@
 local Config    = require("config")
 local Camera    = require("camera")
+local Env       = require("env").bind("Main")
 local PlayerCtx = require("playercontext")
 local Hooks     = require("hooks")
 local Stance    = require("stance")
@@ -30,14 +31,19 @@ if not cfg then
     return
 end
 
-Camera.init(cfg)
-Camera.disable_camera_collision(cfg.DisableCameraCollision)
-
-Hooks.init(Camera, Config)
+local ok_init, init_err = pcall(function()
+    Camera.init(cfg)
+    Camera.disable_camera_collision(cfg.DisableCameraCollision)
+    Hooks.init(Camera, Config)
+end)
+if not ok_init then
+    log_error("Main initialization failed: " .. tostring(init_err), "main_init_failed", true)
+    return
+end
 
 -- ==================== F8: Reload config ====================
 
-RegisterKeyBindAsync(Key.F8, {}, function()
+Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
     local reloaded_cfg = Config.reload()
     if not reloaded_cfg then
         log_error("Config reload failed; keeping the previous runtime config.", "config_reload_failed", true)
@@ -48,7 +54,7 @@ RegisterKeyBindAsync(Key.F8, {}, function()
     if Stance.reset_state then Stance.reset_state() end
     Camera.init(cfg) -- Keep camera's internal reference perfectly synchronized
 
-    ExecuteInGameThread(function()
+    Env.run_on_game_thread("reload_config_apply", function()
         local isTPS    = (PlayerCtx.is_tps_mode() == true)
         local isLockOn = (PlayerCtx.is_lock_on()  == true)
         local isBattle = (PlayerCtx.is_battle()    == true)
@@ -156,7 +162,7 @@ local function adjust_current_fov(delta)
         ensure_lockon_enforcement(cfg)
         Camera.update_enforcement_fov(new_fov)
     else
-        ExecuteInGameThread(function()
+        Env.run_on_game_thread("adjust_fov", function()
             Camera.set_fov_via_function(new_fov, cfg.KeyFOVTransitionSteps)
         end)
     end
@@ -189,7 +195,7 @@ local function adjust_current_position(axis, delta)
         ensure_lockon_enforcement(cfg)
         Camera.update_enforcement_pos(pos)
     else
-        ExecuteInGameThread(function()
+        Env.run_on_game_thread("adjust_position", function()
             Camera.set_camera_relative_location(pos, cfg.KeyFOVTransitionSteps)
         end)
     end
@@ -276,3 +282,4 @@ local function apply_for_current_state()
     end
     Camera.disable_camera_collision(cfg.DisableCameraCollision)
 end
+

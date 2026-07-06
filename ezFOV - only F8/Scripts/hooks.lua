@@ -1,6 +1,7 @@
 local PlayerCtx = require("playercontext")
 local Heartbeat = require("heartbeat")
 local Stance    = require("stance")
+local Env       = require("env").bind("Hooks")
 local Logging   = require("logging")
 
 local os_clock = os.clock
@@ -28,43 +29,11 @@ end
 -- ========================================================================================
 
 local function safe_register_hook(func_path, pre_cb, post_cb)
-    if not RegisterHook then
-        log_error("RegisterHook API is unavailable.", "hooks_registerhook_missing", true)
-        return nil, nil
-    end
-
-    if type(func_path) ~= "string" or func_path == "" then
-        log_error("RegisterHook skipped because the function path was invalid.", "hooks_registerhook_invalid_path", true)
-        return nil, nil
-    end
-
-    if type(pre_cb) ~= "function" then
-        log_error("RegisterHook skipped because the pre-callback was invalid.", "hooks_registerhook_invalid_pre_cb", true)
-        return nil, nil
-    end
-
-    if post_cb ~= nil and type(post_cb) ~= "function" then
-        log_error("RegisterHook skipped because the post-callback was invalid.", "hooks_registerhook_invalid_post_cb", true)
-        return nil, nil
-    end
-
-    local ok, pre_id, post_id = pcall(RegisterHook, func_path, pre_cb, post_cb)
-    if not ok then
-        -- In this case, 'pre_id' actually contains the error string from pcall
-        log_error("RegisterHook failed for " .. tostring(func_path) .. ": " .. tostring(pre_id), "hooks_registerhook_failed", true)
-        return nil, nil
-    end
-
-    return pre_id, post_id
+    return Env.safe_register_hook(func_path, pre_cb, post_cb)
 end
 
 local function unregister_hook(entry)
-    if not entry or not UnregisterHook then return end
-    if entry.pre_id ~= nil or entry.post_id ~= nil then
-        pcall(UnregisterHook, entry.path, entry.pre_id, entry.post_id)
-    end
-    entry.pre_id = nil
-    entry.post_id = nil
+    Env.safe_unregister_hook(entry)
 end
 
 function H.init(Camera, Config)
@@ -90,7 +59,7 @@ function H.init(Camera, Config)
     PlayerCtx.init()
 
     local original_pulse = Stance.pulse
-    Stance.pulse = function()
+    rawset(Stance, "pulse", function()
         local now = os_clock()
         if (now - last_state_change) < STATE_CHANGE_COOLDOWN then
             return
@@ -103,7 +72,7 @@ function H.init(Camera, Config)
         if prev_profile ~= new_profile then
             last_state_change = now
         end
-    end
+    end)
 
     Stance.init(Camera, Config)
 
@@ -155,7 +124,7 @@ function H.init(Camera, Config)
 
                             -- Only set _cold_applied if the camera is actually reachable
                             local cam_ok = pcall(function()
-                                ExecuteInGameThread(function()
+                                Env.run_on_game_thread("cold_apply", function()
                                     H.Camera.set_fov_via_function(cfg.fovs.fov)
                                     H.Camera.set_camera_relative_location(cfg.DefaultPosition)
                                     H.Camera.disable_camera_collision(cfg.DisableCameraCollision)
