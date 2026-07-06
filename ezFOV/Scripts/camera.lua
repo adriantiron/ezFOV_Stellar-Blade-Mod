@@ -248,18 +248,32 @@ local function restore_originals()
         if snap.boom and _saved_originals.target then
             local to = snap.boom.TargetOffset
             if to then
-                to.X = _saved_originals.target.X
-                to.Y = _saved_originals.target.Y
-                to.Z = _saved_originals.target.Z
+                local pos_restore_ok = Env.run_now("restore_originals_target", function()
+                    to.X = _saved_originals.target.X
+                    to.Y = _saved_originals.target.Y
+                    to.Z = _saved_originals.target.Z
+                end)
+                if not pos_restore_ok then
+                    _originals_saved = false
+                    _saved_originals = {}
+                    return
+                end
             end
         end
 
         if snap.cam and _saved_originals.rel_rot then
             local rr = snap.cam.RelativeRotation
             if rr then
-                rr.Pitch = _saved_originals.rel_rot.Pitch
-                rr.Yaw   = _saved_originals.rel_rot.Yaw
-                rr.Roll  = _saved_originals.rel_rot.Roll
+                local rot_restore_ok = Env.run_now("restore_originals_rotation", function()
+                    rr.Pitch = _saved_originals.rel_rot.Pitch
+                    rr.Yaw   = _saved_originals.rel_rot.Yaw
+                    rr.Roll  = _saved_originals.rel_rot.Roll
+                end)
+                if not rot_restore_ok then
+                    _originals_saved = false
+                    _saved_originals = {}
+                    return
+                end
             end
         end
     end
@@ -325,8 +339,15 @@ function M.set_fov_via_function(target_fov, overrideSteps)
 
         if step <= steps then
             local eased = quadratic(step, current_fov, target_fov - current_fov, steps)
-            cam.bManualCameraFovMode = true
-            cam.ManualCameraFov = eased
+            local write_ok = Env.run_now("fov_transition_write", function()
+                cam.bManualCameraFovMode = true
+                cam.ManualCameraFov = eased
+            end)
+            if not write_ok then
+                M._fov_transition_token = nil
+                M._active_target_fov = nil
+                return
+            end
             step = step + 1
             M._fov_transition_token = Env.run_after_delay(1, "fov_transition", tick)
         else
@@ -335,7 +356,8 @@ function M.set_fov_via_function(target_fov, overrideSteps)
         end
     end
 
-    tick()
+    log_debug(string.format("Transition start: fov target=%.2f steps=%d", target_fov or 0, steps), "fov_transition_start")
+    Env.run_now("fov_transition_start", tick)
 end
 
 -- ==================== Camera position transition ====================
@@ -455,9 +477,15 @@ function M.set_camera_relative_location(target_position, overrideSteps)
             return
         end
 
-        l.X = eased.x
-        l.Y = eased.y
-        l.Z = eased.z
+        local write_ok = Env.run_now("camera_transition_write", function()
+            l.X = eased.x
+            l.Y = eased.y
+            l.Z = eased.z
+        end)
+        if not write_ok then
+            finish()
+            return
+        end
 
         if t < 1.0 then
             M._cam_transition_token = Env.run_after_delay(1, "camera_transition", tick)
@@ -504,7 +532,9 @@ function M.set_camera_relative_location(target_position, overrideSteps)
         return
     end
 
-    tick()
+    log_debug(string.format("Transition start: camera pos=(%.2f,%.2f,%.2f) duration_ms=%.0f",
+        to.x or 0, to.y or 0, to.z or 0, duration_ms or 0), "camera_transition_start")
+    Env.run_now("camera_transition_start", tick)
 end
 
 -- ==================== Camera collision ====================
@@ -579,8 +609,10 @@ function M.enforce_fov(target_fov)
     if actual == nil then return end
 
     if math_abs(actual - target_fov) > 0.5 then
-        cam.bManualCameraFovMode = true
-        cam.ManualCameraFov = target_fov
+        Env.run_now("enforce_fov_write", function()
+            cam.bManualCameraFovMode = true
+            cam.ManualCameraFov = target_fov
+        end)
     end
 end
 
@@ -734,15 +766,27 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
             local cam_now_any = cam_now
             local loc_now = cam_now_any.RelativeLocation
             if loc_now then
-                loc_now.X = (M._lockon_exit_from_pos.x or 0) + ((M._lockon_exit_to_pos.x or 0) - (M._lockon_exit_from_pos.x or 0)) * eased
-                loc_now.Y = (M._lockon_exit_from_pos.y or 0) + ((M._lockon_exit_to_pos.y or 0) - (M._lockon_exit_from_pos.y or 0)) * eased
-                loc_now.Z = (M._lockon_exit_from_pos.z or 0) + ((M._lockon_exit_to_pos.z or 0) - (M._lockon_exit_from_pos.z or 0)) * eased
+                local write_ok = Env.run_now("lockon_exit_write_pos", function()
+                    loc_now.X = (M._lockon_exit_from_pos.x or 0) + ((M._lockon_exit_to_pos.x or 0) - (M._lockon_exit_from_pos.x or 0)) * eased
+                    loc_now.Y = (M._lockon_exit_from_pos.y or 0) + ((M._lockon_exit_to_pos.y or 0) - (M._lockon_exit_from_pos.y or 0)) * eased
+                    loc_now.Z = (M._lockon_exit_from_pos.z or 0) + ((M._lockon_exit_to_pos.z or 0) - (M._lockon_exit_from_pos.z or 0)) * eased
+                end)
+                if not write_ok then
+                    cancel_lockon_exit_blend()
+                    return
+                end
             end
         end
 
         if M._lockon_exit_from_fov ~= nil and M._lockon_exit_to_fov ~= nil then
-            cam_now.bManualCameraFovMode = true
-            cam_now.ManualCameraFov = (M._lockon_exit_from_fov or 75) + (M._lockon_exit_to_fov - (M._lockon_exit_from_fov or 75)) * eased
+            local fov_ok = Env.run_now("lockon_exit_write_fov", function()
+                cam_now.bManualCameraFovMode = true
+                cam_now.ManualCameraFov = (M._lockon_exit_from_fov or 75) + (M._lockon_exit_to_fov - (M._lockon_exit_from_fov or 75)) * eased
+            end)
+            if not fov_ok then
+                cancel_lockon_exit_blend()
+                return
+            end
         end
 
         if t < 1.0 then
@@ -755,21 +799,35 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
             local cam_now_any = cam_now
             local loc_now = cam_now_any.RelativeLocation
             if loc_now then
-                loc_now.X = M._lockon_exit_to_pos.x or 0
-                loc_now.Y = M._lockon_exit_to_pos.y or 0
-                loc_now.Z = M._lockon_exit_to_pos.z or 0
+                local final_pos_ok = Env.run_now("lockon_exit_finalize_pos", function()
+                    loc_now.X = M._lockon_exit_to_pos.x or 0
+                    loc_now.Y = M._lockon_exit_to_pos.y or 0
+                    loc_now.Z = M._lockon_exit_to_pos.z or 0
+                end)
+                if not final_pos_ok then
+                    cancel_lockon_exit_blend()
+                    return
+                end
             end
         end
 
         if M._lockon_exit_from_fov ~= nil and M._lockon_exit_to_fov ~= nil then
-            cam_now.bManualCameraFovMode = true
-            cam_now.ManualCameraFov = M._lockon_exit_to_fov
+            local final_fov_ok = Env.run_now("lockon_exit_finalize_fov", function()
+                cam_now.bManualCameraFovMode = true
+                cam_now.ManualCameraFov = M._lockon_exit_to_fov
+            end)
+            if not final_fov_ok then
+                cancel_lockon_exit_blend()
+                return
+            end
         end
 
         cancel_lockon_exit_blend()
     end
 
-    tick()
+    log_debug(string.format("Transition start: lockon_exit target_fov=%s duration_ms=%.0f",
+        tostring(to_fov), duration_ms or 0), "lockon_exit_start")
+    Env.run_now("lockon_exit_start", tick)
     return true
 end
 
@@ -844,9 +902,16 @@ function M.start_enforcement(pos, fov)
             if _enf_boom and obj_is_valid(_enf_boom) then
                 local to = _enf_boom.TargetOffset
                 if to then
-                    to.X = world_x
-                    to.Y = world_y
-                    to.Z = height
+                    local pos_ok = Env.run_now("lockon_enforce_write_pos", function()
+                        to.X = world_x
+                        to.Y = world_y
+                        to.Z = height
+                    end)
+                    if not pos_ok then
+                        _enforce_token = nil
+                        clear_enforcement_caches()
+                        return
+                    end
                 end
             end
         end
@@ -859,13 +924,20 @@ function M.start_enforcement(pos, fov)
             local enf_cam_any = _enf_cam
             local rel_rot = obj_is_valid(enf_cam_any) and enf_cam_any.RelativeRotation or nil
             if rel_rot then
-                if has_yaw then
-                    rel_rot.Yaw = M._enforce_yaw_bias
-                end
-                if has_pitch then
-                    -- Negative pitch = camera looks down = target shifts UP on screen
-                    -- So we negate: positive config value = target UP
-                    rel_rot.Pitch = -M._enforce_pitch_bias
+                local rot_ok = Env.run_now("lockon_enforce_write_rot", function()
+                    if has_yaw then
+                        rel_rot.Yaw = M._enforce_yaw_bias
+                    end
+                    if has_pitch then
+                        -- Negative pitch = camera looks down = target shifts UP on screen
+                        -- So we negate: positive config value = target UP
+                        rel_rot.Pitch = -M._enforce_pitch_bias
+                    end
+                end)
+                if not rot_ok then
+                    _enforce_token = nil
+                    clear_enforcement_caches()
+                    return
                 end
             end
         end
@@ -874,8 +946,15 @@ function M.start_enforcement(pos, fov)
         if M._enforce_fov then
             ---@type any
             local enf_cam_any = _enf_cam
-            enf_cam_any.bManualCameraFovMode = true
-            enf_cam_any.ManualCameraFov = M._enforce_fov
+            local fov_ok = Env.run_now("lockon_enforce_write_fov", function()
+                enf_cam_any.bManualCameraFovMode = true
+                enf_cam_any.ManualCameraFov = M._enforce_fov
+            end)
+            if not fov_ok then
+                _enforce_token = nil
+                clear_enforcement_caches()
+                return
+            end
         end
 
         _enforce_token = Env.run_after_delay(_ENFORCE_TICK_MS, "lockon_enforce_tick", loop)
@@ -889,7 +968,7 @@ function M.start_enforcement(pos, fov)
         M._enforce_yaw_bias or 0,
         M._enforce_pitch_bias or 0), "enforce_start")
 
-    loop()
+    Env.run_now("lockon_enforce_start", loop)
 end
 
 function M.stop_enforcement()
