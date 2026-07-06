@@ -11,8 +11,32 @@ local Env = {
     ModifierKey = rawget(_G, "ModifierKey"),
 }
 
+local debug_traceback = debug and debug.traceback
+
 local function log_error(component, message, once_key)
     Logging.log_error(component, message, once_key, true)
+end
+
+local function format_error_with_trace(err)
+    if type(debug_traceback) == "function" then
+        return tostring(debug_traceback(tostring(err), 2))
+    end
+    return tostring(err)
+end
+
+local function run_guarded(component, context, kind, fn)
+    local ok, err = xpcall(fn, function(e)
+        return format_error_with_trace(e)
+    end)
+    if not ok then
+        log_error(component, context .. " failed: " .. tostring(err), context .. "_" .. kind .. "_error")
+        return false
+    end
+    return true
+end
+
+function Env.run_now(component, context, fn)
+    return run_guarded(component, context, "immediate", fn)
 end
 
 function Env.run_on_game_thread(component, context, fn)
@@ -23,10 +47,7 @@ function Env.run_on_game_thread(component, context, fn)
     end
 
     execute(function()
-        local ok, err = pcall(fn)
-        if not ok then
-            log_error(component, context .. " failed: " .. tostring(err), context .. "_thread_error")
-        end
+        run_guarded(component, context, "thread", fn)
     end)
 end
 
@@ -38,10 +59,7 @@ function Env.run_after_delay(component, delay_ms, context, fn)
     end
 
     return execute(delay_ms, function()
-        local ok, err = pcall(fn)
-        if not ok then
-            log_error(component, context .. " failed: " .. tostring(err), context .. "_delay_error")
-        end
+        run_guarded(component, context, "delay", fn)
     end)
 end
 
@@ -53,10 +71,7 @@ function Env.register_safe_keybind(component, key, modifiers, label, fn)
     end
 
     register(key, modifiers, function()
-        local ok, err = pcall(fn)
-        if not ok then
-            log_error(component, label .. " failed: " .. tostring(err), label .. "_keybind_error")
-        end
+        run_guarded(component, label, "keybind", fn)
     end)
 end
 
@@ -82,9 +97,11 @@ function Env.safe_register_hook(component, func_path, pre_cb, post_cb)
         return nil, nil
     end
 
-    local ok, pre_id, post_id = pcall(register, func_path, pre_cb, post_cb)
+    local pre_id, post_id
+    local ok = run_guarded(component, "hooks_registerhook", "hook", function()
+        pre_id, post_id = register(func_path, pre_cb, post_cb)
+    end)
     if not ok then
-        log_error(component, "RegisterHook failed for " .. tostring(func_path) .. ": " .. tostring(pre_id), "hooks_registerhook_failed")
         return nil, nil
     end
 
@@ -95,7 +112,9 @@ function Env.safe_unregister_hook(component, entry)
     local unregister = Env.UnregisterHook
     if not entry or not unregister then return end
     if entry.pre_id ~= nil or entry.post_id ~= nil then
-        pcall(unregister, entry.path, entry.pre_id, entry.post_id)
+        run_guarded(component, "hooks_unregisterhook", "hook", function()
+            unregister(entry.path, entry.pre_id, entry.post_id)
+        end)
     end
     entry.pre_id = nil
     entry.post_id = nil
@@ -117,6 +136,9 @@ function Env.bind(component)
         end,
         run_after_delay = function(delay_ms, context, fn)
             return Env.run_after_delay(scope, delay_ms, context, fn)
+        end,
+        run_now = function(context, fn)
+            return Env.run_now(scope, context, fn)
         end,
         register_safe_keybind = function(key, modifiers, label, fn)
             return Env.register_safe_keybind(scope, key, modifiers, label, fn)
