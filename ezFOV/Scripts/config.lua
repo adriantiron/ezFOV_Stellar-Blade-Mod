@@ -1,4 +1,5 @@
 local Logging = require("logging")
+local Env = require("env").bind("Config")
 
 local format = string.format
 
@@ -212,10 +213,10 @@ local _save_timer = nil
 
 function M.write()
     -- Cancel any pending save if the user presses a hotkey again within 200ms
-    if _save_timer then CancelDelay(_save_timer) end
+    if _save_timer then Env.CancelDelay(_save_timer) end
     
     -- Wait 200ms after the user finishes adjusting before writing to disk
-    _save_timer = ExecuteWithDelay(200, function()
+    _save_timer = Env.run_after_delay(200, "config_write", function()
         _save_timer = nil
         
         local cfg = M.get()
@@ -359,45 +360,56 @@ function M.write()
 end
 
 function M.save_preset(num)
-    local cfg = M.get()
-    local p = cfg.path .. "_preset" .. tostring(num)
-    local f = io.open(p, "w")
-    if not f then
-        log_error(format("Could not save preset %d.", num), "preset_save_open_failed")
-        return
+    local ok, err = pcall(function()
+        local cfg = M.get()
+        local p = cfg.path .. "_preset" .. tostring(num)
+        local f = io.open(p, "w")
+        if not f then
+            log_error(format("Could not save preset %d.", num), "preset_save_open_failed")
+            return
+        end
+
+        f:write("; PRESET " .. num .. "\n\n")
+        f:write("DisableCameraCollision=" .. tostring(cfg.DisableCameraCollision) .. "\n")
+        f:write(format("DefaultCamX=%.4f\nDefaultCamY=%.4f\nDefaultCamZ=%.4f\n", cfg.DefaultPosition.x or 0, cfg.DefaultPosition.y or 0, cfg.DefaultPosition.z or 0))
+        f:write(format("CombatCamX=%.4f\nCombatCamY=%.4f\nCombatCamZ=%.4f\n", cfg.CombatPosition.x or 0, cfg.CombatPosition.y or 0, cfg.CombatPosition.z or 0))
+        f:write(format("LockOnCamX=%.4f\nLockOnCamY=%.4f\nLockOnCamZ=%.4f\n", cfg.LockOnPosition.x or 0, cfg.LockOnPosition.y or 0, cfg.LockOnPosition.z or 0))
+        f:write(format("LockOnYawBias=%.1f\n", cfg.LockOnYawBias or 0))
+        f:write(format("LockOnPitchBias=%.1f\n", cfg.LockOnPitchBias or 0))
+        f:write(format("IdleCamX=%.4f\nIdleCamY=%.4f\nIdleCamZ=%.4f\n", cfg.IdlePosition.x or 0, cfg.IdlePosition.y or 0, cfg.IdlePosition.z or 0))
+        f:write(format("WalkCamX=%.4f\nWalkCamY=%.4f\nWalkCamZ=%.4f\n", cfg.WalkPosition.x or 0, cfg.WalkPosition.y or 0, cfg.WalkPosition.z or 0))
+        f:write(format("SprintCamX=%.4f\nSprintCamY=%.4f\nSprintCamZ=%.4f\n", cfg.SprintPosition.x or 0, cfg.SprintPosition.y or 0, cfg.SprintPosition.z or 0))
+        f:write("FOV=" .. tostring(cfg.fovs.fov) .. "\n")
+        f:write("CombatFOV=" .. tostring(cfg.fovs.combat) .. "\n")
+        f:write("LockOnFOV=" .. tostring(cfg.fovs.lockon) .. "\n")
+        f:write("TPSFOV=" .. tostring(cfg.fovs.tps) .. "\n")
+        f:write("IdleFOV=" .. tostring(cfg.fovs.idle) .. "\n")
+        f:write("WalkFOV=" .. tostring(cfg.fovs.walk) .. "\n")
+        f:write("SprintFOV=" .. tostring(cfg.fovs.sprint) .. "\n")
+        f:write("FOVTransitionSteps=" .. tostring(cfg.FOVTransitionSteps) .. "\n")
+        f:write("KeyFOVTransitionSteps=" .. tostring(cfg.KeyFOVTransitionSteps) .. "\n")
+        f:write("LockOnExitBlendTime=" .. tostring(cfg.LockOnExitBlendTime or DEFAULTS.LockOnExitBlendTime) .. "\n")
+        f:write("EnableIdleCamera=" .. tostring(cfg.EnableIdleCamera) .. "\n")
+        f:write("EnableWalkingCamera=" .. tostring(cfg.EnableWalkingCamera) .. "\n")
+        f:write("EnableSprintingCamera=" .. tostring(cfg.EnableSprintingCamera) .. "\n")
+        f:write("EnableLockOnCamera=" .. tostring(cfg.EnableLockOnCamera) .. "\n")
+
+        f:close()
+        log_debug(format("Saved preset %d.", num), "preset_saved")
+    end)
+
+    if not ok then
+        log_error(format("Preset %d save failed: %s", num, tostring(err)), "preset_save_failed", true)
     end
-
-    f:write("; PRESET " .. num .. "\n\n")
-    f:write("DisableCameraCollision=" .. tostring(cfg.DisableCameraCollision) .. "\n")
-    f:write(format("DefaultCamX=%.4f\nDefaultCamY=%.4f\nDefaultCamZ=%.4f\n", cfg.DefaultPosition.x or 0, cfg.DefaultPosition.y or 0, cfg.DefaultPosition.z or 0))
-    f:write(format("CombatCamX=%.4f\nCombatCamY=%.4f\nCombatCamZ=%.4f\n", cfg.CombatPosition.x or 0, cfg.CombatPosition.y or 0, cfg.CombatPosition.z or 0))
-    f:write(format("LockOnCamX=%.4f\nLockOnCamY=%.4f\nLockOnCamZ=%.4f\n", cfg.LockOnPosition.x or 0, cfg.LockOnPosition.y or 0, cfg.LockOnPosition.z or 0))
-    f:write(format("LockOnYawBias=%.1f\n", cfg.LockOnYawBias or 0))
-    f:write(format("LockOnPitchBias=%.1f\n", cfg.LockOnPitchBias or 0))
-    f:write(format("IdleCamX=%.4f\nIdleCamY=%.4f\nIdleCamZ=%.4f\n", cfg.IdlePosition.x or 0, cfg.IdlePosition.y or 0, cfg.IdlePosition.z or 0))
-    f:write(format("WalkCamX=%.4f\nWalkCamY=%.4f\nWalkCamZ=%.4f\n", cfg.WalkPosition.x or 0, cfg.WalkPosition.y or 0, cfg.WalkPosition.z or 0))
-    f:write(format("SprintCamX=%.4f\nSprintCamY=%.4f\nSprintCamZ=%.4f\n", cfg.SprintPosition.x or 0, cfg.SprintPosition.y or 0, cfg.SprintPosition.z or 0))
-    f:write("FOV=" .. tostring(cfg.fovs.fov) .. "\n")
-    f:write("CombatFOV=" .. tostring(cfg.fovs.combat) .. "\n")
-    f:write("LockOnFOV=" .. tostring(cfg.fovs.lockon) .. "\n")
-    f:write("TPSFOV=" .. tostring(cfg.fovs.tps) .. "\n")
-    f:write("IdleFOV=" .. tostring(cfg.fovs.idle) .. "\n")
-    f:write("WalkFOV=" .. tostring(cfg.fovs.walk) .. "\n")
-    f:write("SprintFOV=" .. tostring(cfg.fovs.sprint) .. "\n")
-    f:write("FOVTransitionSteps=" .. tostring(cfg.FOVTransitionSteps) .. "\n")
-    f:write("KeyFOVTransitionSteps=" .. tostring(cfg.KeyFOVTransitionSteps) .. "\n")
-    f:write("LockOnExitBlendTime=" .. tostring(cfg.LockOnExitBlendTime or DEFAULTS.LockOnExitBlendTime) .. "\n")
-    f:write("EnableIdleCamera=" .. tostring(cfg.EnableIdleCamera) .. "\n")
-    f:write("EnableWalkingCamera=" .. tostring(cfg.EnableWalkingCamera) .. "\n")
-    f:write("EnableSprintingCamera=" .. tostring(cfg.EnableSprintingCamera) .. "\n")
-    f:write("EnableLockOnCamera=" .. tostring(cfg.EnableLockOnCamera) .. "\n")
-
-    f:close()
-    log_debug(format("Saved preset %d.", num), "preset_saved")
 end
 
 function M.load_preset(num)
     local cfg = M.get()
+    if not cfg or type(cfg) ~= "table" or type(cfg.fovs) ~= "table" then
+        log_error(format("Preset %d load failed because the runtime config is invalid.", num), "preset_load_missing_cfg", true)
+        return false
+    end
+
     local p = cfg.path .. "_preset" .. tostring(num)
 
     local test = io.open(p, "r")
@@ -441,7 +453,7 @@ end
 
 function M.cancel_pending_write()
     if _save_timer then
-        CancelDelay(_save_timer)
+        Env.CancelDelay(_save_timer)
         _save_timer = nil
     end
 end

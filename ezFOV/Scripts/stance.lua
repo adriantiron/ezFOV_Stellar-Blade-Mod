@@ -1,4 +1,5 @@
 local PlayerCtx = require("playercontext")
+local Env = require("env").bind("Stance")
 local Logging   = require("logging")
 
 local math_abs = math.abs
@@ -57,9 +58,14 @@ local function ready()
 end
 
 local function choose_profile(state, cfg)
+    if not state or type(state) ~= "table" then return "default" end
     if state.tps == true then return "tps" end
 	
 	local current_cfg = cfg or (Config and Config.get())
+    if not current_cfg or type(current_cfg) ~= "table" or type(current_cfg.fovs) ~= "table" then
+        log_error("Profile selection aborted because the runtime config is invalid.", "stance_choose_profile_missing_cfg", true)
+        return "default"
+    end
 
     if state.lockon == true and current_cfg.EnableLockOnCamera then
         _lockon_last_true = os.clock()
@@ -106,8 +112,12 @@ local function apply_fov_transition(target_fov, steps_override)
     end
 
     local cfg = Config.get()
+    if not cfg or type(cfg) ~= "table" then
+        log_error("Unable to apply an FOV transition because the config is invalid.", "stance_apply_fov_missing_cfg", true)
+        return
+    end
     local steps = steps_override or cfg.FOVTransitionSteps
-    ExecuteInGameThread(function()
+    Env.run_on_game_thread("stance_apply_fov", function()
         Camera.set_fov_via_function(target_fov, steps)
     end)
     M._applied_fov = target_fov
@@ -130,7 +140,7 @@ local function apply_position_for_profile(profile, cfg, steps_override)
             return
         end
 
-        ExecuteInGameThread(function()
+        Env.run_on_game_thread("stance_apply_position", function()
             Camera.set_camera_relative_location(pos, steps_override)
         end)
     end
@@ -177,7 +187,7 @@ local function apply_profile(profile, cfg)
         elseif profile == "default" then target_pos = cfg.DefaultPosition
         end
 
-        ExecuteInGameThread(function()
+        Env.run_on_game_thread("stance_lockon_exit_blend", function()
             local started = Camera.begin_lockon_exit_blend(target_pos, target_fov, nil, cfg.LockOnExitBlendTime)
             if not started then
                 log_warn("Lock-on exit blend could not start; falling back to the standard transition path.", "lockon_exit_fallback", true)
@@ -213,6 +223,10 @@ function M.pulse()
     M._last_tick = t
 
     local cfg = Config.get()
+    if not cfg or type(cfg) ~= "table" or type(cfg.fovs) ~= "table" then
+        log_error("Stance pulse aborted because the runtime config is invalid.", "stance_pulse_missing_cfg", true)
+        return
+    end
 
     local state = {}
 
@@ -244,7 +258,7 @@ function M.pulse()
     if Camera.is_transitioning and not Camera.is_transitioning() then
         local target = fov_for_profile(M._applied_profile, cfg)
         if target then
-            ExecuteInGameThread(function()
+            Env.run_on_game_thread("stance_enforce_fov", function()
                 Camera.enforce_fov(target)
             end)
         end

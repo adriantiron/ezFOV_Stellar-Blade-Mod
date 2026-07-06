@@ -1,4 +1,5 @@
 local Logging = require("logging")
+local Env = require("env").bind("Heartbeat")
 
 -- This caches the functions in memory, saving a microscopic amount of CPU every frame.
 local os_clock = os.clock
@@ -79,7 +80,7 @@ function Heartbeat.pulse()
     local my = Heartbeat._drop_gen
     local drop_ms = Heartbeat.drop_ms
 
-    ExecuteWithDelay(drop_ms, function()
+    Env.run_after_delay(drop_ms, "heartbeat_drop", function()
         if my ~= Heartbeat._drop_gen then return end
         local since = now_ms() - (Heartbeat._last_ms or 0)
         if since < drop_ms - 1 then return end

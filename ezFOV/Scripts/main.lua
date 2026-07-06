@@ -1,5 +1,6 @@
 local Config    = require("config")
 local Camera    = require("camera")
+local Env       = require("env").bind("Main")
 local PlayerCtx = require("playercontext")
 local Hooks     = require("hooks")
 local Stance    = require("stance")
@@ -30,14 +31,19 @@ if not cfg then
     return
 end
 
-Camera.init(cfg)
-Camera.disable_camera_collision(cfg.DisableCameraCollision)
-
-Hooks.init(Camera, Config)
+local ok_init, init_err = pcall(function()
+    Camera.init(cfg)
+    Camera.disable_camera_collision(cfg.DisableCameraCollision)
+    Hooks.init(Camera, Config)
+end)
+if not ok_init then
+    log_error("Main initialization failed: " .. tostring(init_err), "main_init_failed", true)
+    return
+end
 
 -- ==================== F8: Reload config ====================
 
-RegisterKeyBindAsync(Key.F8, {}, function()
+Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
     local reloaded_cfg = Config.reload()
     if not reloaded_cfg then
         log_error("Config reload failed; keeping the previous runtime config.", "config_reload_failed", true)
@@ -48,7 +54,7 @@ RegisterKeyBindAsync(Key.F8, {}, function()
     if Stance.reset_state then Stance.reset_state() end
     Camera.init(cfg) -- Keep camera's internal reference perfectly synchronized
 
-    ExecuteInGameThread(function()
+    Env.run_on_game_thread("reload_config_apply", function()
         local isTPS    = (PlayerCtx.is_tps_mode() == true)
         local isLockOn = (PlayerCtx.is_lock_on()  == true)
         local isBattle = (PlayerCtx.is_battle()    == true)
@@ -156,7 +162,7 @@ local function adjust_current_fov(delta)
         ensure_lockon_enforcement(cfg)
         Camera.update_enforcement_fov(new_fov)
     else
-        ExecuteInGameThread(function()
+        Env.run_on_game_thread("adjust_fov", function()
             Camera.set_fov_via_function(new_fov, cfg.KeyFOVTransitionSteps)
         end)
     end
@@ -189,7 +195,7 @@ local function adjust_current_position(axis, delta)
         ensure_lockon_enforcement(cfg)
         Camera.update_enforcement_pos(pos)
     else
-        ExecuteInGameThread(function()
+        Env.run_on_game_thread("adjust_position", function()
             Camera.set_camera_relative_location(pos, cfg.KeyFOVTransitionSteps)
         end)
     end
@@ -279,47 +285,47 @@ end
 
 -- ==================== Keybinds: FOV ====================
 
-RegisterKeyBindAsync(Key.F5, {}, function() adjust_current_fov(-25) end)
-RegisterKeyBindAsync(Key.F6, {}, function() adjust_current_fov(-5)  end)
-RegisterKeyBindAsync(Key.F7, {}, function() adjust_current_fov(5)   end)
+Env.register_safe_keybind(Env.Key.F5, {}, "adjust_fov_f5", function() adjust_current_fov(-25) end)
+Env.register_safe_keybind(Env.Key.F6, {}, "adjust_fov_f6", function() adjust_current_fov(-5)  end)
+Env.register_safe_keybind(Env.Key.F7, {}, "adjust_fov_f7", function() adjust_current_fov(5)   end)
 
 -- ==================== Keybinds: Position ====================
 
-RegisterKeyBindAsync(Key.UP_ARROW,    {ModifierKey.CONTROL}, function() adjust_current_position("x",  50) end)
-RegisterKeyBindAsync(Key.DOWN_ARROW,  {ModifierKey.CONTROL}, function() adjust_current_position("x", -50) end)
-RegisterKeyBindAsync(Key.UP_ARROW,    {ModifierKey.ALT},     function() adjust_current_position("z",  10) end)
-RegisterKeyBindAsync(Key.DOWN_ARROW,  {ModifierKey.ALT},     function() adjust_current_position("z", -10) end)
-RegisterKeyBindAsync(Key.LEFT_ARROW,  {ModifierKey.ALT},     function() adjust_current_position("y", -10) end)
-RegisterKeyBindAsync(Key.RIGHT_ARROW, {ModifierKey.ALT},     function() adjust_current_position("y",  10) end)
+Env.register_safe_keybind(Env.Key.UP_ARROW,    {Env.ModifierKey.CONTROL}, "adjust_position_ctrl_up", function() adjust_current_position("x",  50) end)
+Env.register_safe_keybind(Env.Key.DOWN_ARROW,  {Env.ModifierKey.CONTROL}, "adjust_position_ctrl_down", function() adjust_current_position("x", -50) end)
+Env.register_safe_keybind(Env.Key.UP_ARROW,    {Env.ModifierKey.ALT},     "adjust_position_alt_up", function() adjust_current_position("z",  10) end)
+Env.register_safe_keybind(Env.Key.DOWN_ARROW,  {Env.ModifierKey.ALT},     "adjust_position_alt_down", function() adjust_current_position("z", -10) end)
+Env.register_safe_keybind(Env.Key.LEFT_ARROW,  {Env.ModifierKey.ALT},     "adjust_position_alt_left", function() adjust_current_position("y", -10) end)
+Env.register_safe_keybind(Env.Key.RIGHT_ARROW, {Env.ModifierKey.ALT},     "adjust_position_alt_right", function() adjust_current_position("y",  10) end)
 
 -- ==================== Keybinds: Lock-on biases ====================
 -- SHIFT + UP/DOWN    = PitchBias (target up/down on screen)
 -- SHIFT + LEFT/RIGHT = YawBias   (target left/right on screen)
 
-RegisterKeyBindAsync(Key.UP_ARROW,    {ModifierKey.SHIFT}, function() adjust_lockon_bias("LockOnPitchBias",  1) end)
-RegisterKeyBindAsync(Key.DOWN_ARROW,  {ModifierKey.SHIFT}, function() adjust_lockon_bias("LockOnPitchBias", -1) end)
-RegisterKeyBindAsync(Key.RIGHT_ARROW, {ModifierKey.SHIFT}, function() adjust_lockon_bias("LockOnYawBias",    1) end)
-RegisterKeyBindAsync(Key.LEFT_ARROW,  {ModifierKey.SHIFT}, function() adjust_lockon_bias("LockOnYawBias",   -1) end)
+Env.register_safe_keybind(Env.Key.UP_ARROW,    {Env.ModifierKey.SHIFT}, "adjust_bias_shift_up", function() adjust_lockon_bias("LockOnPitchBias",  1) end)
+Env.register_safe_keybind(Env.Key.DOWN_ARROW,  {Env.ModifierKey.SHIFT}, "adjust_bias_shift_down", function() adjust_lockon_bias("LockOnPitchBias", -1) end)
+Env.register_safe_keybind(Env.Key.RIGHT_ARROW, {Env.ModifierKey.SHIFT}, "adjust_bias_shift_right", function() adjust_lockon_bias("LockOnYawBias",    1) end)
+Env.register_safe_keybind(Env.Key.LEFT_ARROW,  {Env.ModifierKey.SHIFT}, "adjust_bias_shift_left", function() adjust_lockon_bias("LockOnYawBias",   -1) end)
 
 -- ==================== Keybinds: Presets ====================
 
-RegisterKeyBindAsync(Key.ONE,   {ModifierKey.ALT}, function() Config.save_preset(1) end)
-RegisterKeyBindAsync(Key.TWO,   {ModifierKey.ALT}, function() Config.save_preset(2) end)
-RegisterKeyBindAsync(Key.THREE, {ModifierKey.ALT}, function() Config.save_preset(3) end)
-RegisterKeyBindAsync(Key.FOUR,  {ModifierKey.ALT}, function() Config.save_preset(4) end)
+Env.register_safe_keybind(Env.Key.ONE,   {Env.ModifierKey.ALT}, "save_preset_1", function() Config.save_preset(1) end)
+Env.register_safe_keybind(Env.Key.TWO,   {Env.ModifierKey.ALT}, "save_preset_2", function() Config.save_preset(2) end)
+Env.register_safe_keybind(Env.Key.THREE, {Env.ModifierKey.ALT}, "save_preset_3", function() Config.save_preset(3) end)
+Env.register_safe_keybind(Env.Key.FOUR,  {Env.ModifierKey.ALT}, "save_preset_4", function() Config.save_preset(4) end)
 
 -- ==================== Keybinds: Presets Loading loop ====================
 -- ALT  + 1-4 = Saves current configurations to preset files (Handled above)
 -- CTRL + 1-4 = Loads and dynamically applies preset profiles (Handled here)
 
-local preset_keys = {Key.ONE, Key.TWO, Key.THREE, Key.FOUR}
+local preset_keys = {Env.Key.ONE, Env.Key.TWO, Env.Key.THREE, Env.Key.FOUR}
 for i = 1, 4 do
     local key = preset_keys[i]
     local num = i
-    RegisterKeyBindAsync(key, {ModifierKey.CONTROL}, function()
+    Env.register_safe_keybind(key, {Env.ModifierKey.CONTROL}, "load_preset_" .. tostring(num), function()
         if Config.load_preset(num) then
             Config.write()
-            ExecuteInGameThread(function()
+            Env.run_on_game_thread("apply_preset_" .. tostring(num), function()
                 apply_for_current_state()
                 log_debug(string.format("Applied Preset %d", num), "apply_preset")
             end)
