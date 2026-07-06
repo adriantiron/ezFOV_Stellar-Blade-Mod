@@ -10,6 +10,24 @@ package.preload["UEHelpers"] = function()
 	return {}
 end
 
+local _original_globals = {
+	ExecuteInGameThread = _G.ExecuteInGameThread,
+	ExecuteWithDelay = _G.ExecuteWithDelay,
+	CancelDelay = _G.CancelDelay,
+	RegisterKeyBindAsync = _G.RegisterKeyBindAsync,
+	RegisterHook = _G.RegisterHook,
+	UnregisterHook = _G.UnregisterHook,
+	FindFirstOf = _G.FindFirstOf,
+	Key = _G.Key,
+	ModifierKey = _G.ModifierKey,
+}
+
+local function restore_host_globals()
+	for k, v in pairs(_original_globals) do
+		_G[k] = v
+	end
+end
+
 local _thread_invocations = 0
 local _delay_invocations = 0
 local _delay_token = 0
@@ -83,6 +101,8 @@ local function with_captured_print(fn)
 	end
 	return logs
 end
+
+local function run_tests()
 
 local script_files = {
 	"./ezFOV - only F8/Scripts/env.lua",
@@ -172,12 +192,21 @@ end), "run_now should return true for non-throwing callback")
 assert_true(ran_immediate, "run_now should execute callback")
 
 local guard_error_logs = with_captured_print(function()
+	local prev_mode = Env.is_immediate_traceback_enabled()
 	Env.set_immediate_traceback_enabled(false)
-	local ok = Env.run_now("Sanity", "immediate_fail", function()
-		error("boom")
+
+	local ok_run, run_err = pcall(function()
+		local ok = Env.run_now("Sanity", "immediate_fail", function()
+			error("boom")
+		end)
+		assert(ok == false, "run_now should return false on callback failure")
 	end)
-	assert(ok == false, "run_now should return false on callback failure")
-	Env.set_immediate_traceback_enabled(true)
+
+	Env.set_immediate_traceback_enabled(prev_mode)
+
+	if not ok_run then
+		error(run_err)
+	end
 end)
 assert(#guard_error_logs >= 1, "failing run_now should produce an error log")
 
@@ -215,5 +244,20 @@ assert(type(cfg.fovs) == "table", "config should include fovs table")
 assert(type(cfg.fovs.fov) == "number", "config fov should be numeric")
 assert(type(cfg.DefaultPosition) == "table", "config should include DefaultPosition")
 assert(type(cfg.DefaultPosition.x) == "number", "DefaultPosition.x should be numeric")
+
+end
+
+local function format_error(err)
+	if debug and type(debug.traceback) == "function" then
+		return debug.traceback(tostring(err), 2)
+	end
+	return tostring(err)
+end
+
+local ok, err = xpcall(run_tests, format_error)
+restore_host_globals()
+if not ok then
+	error(err)
+end
 
 print("module_sanity_test ok")
