@@ -123,12 +123,10 @@ function H.init(Camera, Config)
                             end
 
                             -- Only set _cold_applied if the camera is actually reachable
-                            local cam_ok = pcall(function()
-                                Env.run_on_game_thread("cold_apply", function()
-                                    H.Camera.set_fov_via_function(cfg.fovs.fov)
-                                    H.Camera.set_camera_relative_location(cfg.DefaultPosition)
-                                    H.Camera.disable_camera_collision(cfg.DisableCameraCollision)
-                                end)
+                            local cam_ok = Env.run_on_game_thread("cold_apply", function()
+                                H.Camera.set_fov_via_function(cfg.fovs.fov)
+                                H.Camera.set_camera_relative_location(cfg.DefaultPosition)
+                                H.Camera.disable_camera_collision(cfg.DisableCameraCollision)
                             end)
 
                             if cam_ok then
