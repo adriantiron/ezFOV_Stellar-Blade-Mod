@@ -1,4 +1,4 @@
-package.path = package.path .. ";./ezFOV - only F8/Scripts/?.lua;./ezFOV - only F8/Scripts/?/init.lua"
+package.path = package.path .. ";./ezFOV_onlyF8/Scripts/?.lua;./ezFOV_onlyF8/Scripts/?/init.lua"
 
 -- Offline pre-deploy sanity test (heavier than in-game guards):
 -- 1) Parse-check script files
@@ -105,16 +105,16 @@ end
 local function run_tests()
 
 local script_files = {
-	"./ezFOV - only F8/Scripts/env.lua",
-	"./ezFOV - only F8/Scripts/logging.lua",
-	"./ezFOV - only F8/Scripts/heartbeat.lua",
-	"./ezFOV - only F8/Scripts/playercontext.lua",
-	"./ezFOV - only F8/Scripts/config.lua",
-	"./ezFOV - only F8/Scripts/camera.lua",
-	"./ezFOV - only F8/Scripts/stance.lua",
-	"./ezFOV - only F8/Scripts/hooks.lua",
-	"./ezFOV - only F8/Scripts/main.lua",
-	"./ezFOV - only F8/Scripts/tests/sanity_test.lua",
+	"./ezFOV_onlyF8/Scripts/env.lua",
+	"./ezFOV_onlyF8/Scripts/logging.lua",
+	"./ezFOV_onlyF8/Scripts/heartbeat.lua",
+	"./ezFOV_onlyF8/Scripts/playercontext.lua",
+	"./ezFOV_onlyF8/Scripts/config.lua",
+	"./ezFOV_onlyF8/Scripts/camera.lua",
+	"./ezFOV_onlyF8/Scripts/stance.lua",
+	"./ezFOV_onlyF8/Scripts/hooks.lua",
+	"./ezFOV_onlyF8/Scripts/main.lua",
+	"./ezFOV_onlyF8/Scripts/tests/sanity_test.lua",
 }
 
 for _, path in ipairs(script_files) do
