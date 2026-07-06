@@ -570,9 +570,11 @@ function M.init(cfg)
         return
     end
 
+    -- Always refresh the live config reference so F8 reload updates transition settings.
+    M._cfg = cfg
+
     if M._already_initialized then return end
     M._already_initialized = true
-    M._cfg = cfg
 
     Env.run_on_game_thread("camera_init_set_fov", function()
         M.set_fov_via_function(cfg.fovs.fov)

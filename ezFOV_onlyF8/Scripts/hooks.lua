@@ -14,6 +14,7 @@ local H = {
 local last_state_change = 0
 local STATE_CHANGE_COOLDOWN = 0.3
 local POST_COLD_APPLY_PULSE_DELAY_MS = 120
+local RELOAD_DEFER_DEFAULT_MS = 180
 local DEBUG_BOOTSTRAP_STATE_MACHINE = false
 
 local BOOTSTRAP_IDLE = "idle"
@@ -130,6 +131,15 @@ local function is_bootstrap_gate_active()
     return Bootstrap.state ~= BOOTSTRAP_IDLE
 end
 
+function H.defer_stance_pulse(duration_ms, reason)
+    local ms = tonumber(duration_ms) or RELOAD_DEFER_DEFAULT_MS
+    if ms < 0 then ms = 0 end
+    -- Wrapper blocks while (now - last_state_change) < STATE_CHANGE_COOLDOWN,
+    -- so shift by cooldown to make external defer duration match requested ms.
+    last_state_change = os_clock() + (ms / 1000.0) - STATE_CHANGE_COOLDOWN
+    log_debug("Hooks stance pulse deferred for " .. tostring(math.floor(ms)) .. "ms (" .. tostring(reason or "unspecified") .. ")", "hooks_defer_stance_pulse", true)
+end
+
 function H.init(Camera, Config)
     log_debug("Hooks init: starting initialization", "hooks_init_start")
 
@@ -242,7 +252,6 @@ function H.init(Camera, Config)
                             end)
 
                             if not cam_ok then
-                                Bootstrap.cold_apply_pending = false
                                 set_bootstrap_state(BOOTSTRAP_IDLE, "cold_apply_schedule_failed")
                                 log_warn("Cold-apply deferred: Camera interface not ready yet.", "cold_apply_defer")
                             end

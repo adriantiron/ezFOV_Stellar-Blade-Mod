@@ -107,6 +107,7 @@ Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
 
     cfg = reloaded_cfg
     if Stance.reset_state then Stance.reset_state() end
+    if Hooks.defer_stance_pulse then Hooks.defer_stance_pulse(220, "f8_reload") end
     Camera.init(cfg) -- Keep camera's internal reference perfectly synchronized
 
     Env.run_on_game_thread("reload_config_apply", function()
