@@ -47,6 +47,12 @@ log_debug(
     true
 )
 
+log_debug(
+    "Env initialized: immediate traceback " .. (Env.is_immediate_traceback_enabled() and "ENABLED" or "DISABLED"),
+    "env_mode_startup",
+    true
+)
+
 -- ==================== F8: Reload config ====================
 
 Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()

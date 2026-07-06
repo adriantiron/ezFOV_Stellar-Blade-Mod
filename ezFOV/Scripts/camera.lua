@@ -94,10 +94,15 @@ local function obj_is_valid(obj)
     return ok and valid == true
 end
 
-local function safe_write(fn, context)
+local function safe_write(fn, context, once_key)
     local ok, err = pcall(fn)
     if not ok then
-        log_warn((context or "Property write") .. " failed (object likely mid-destruction): " .. tostring(err), "safe_write_fail")
+        local ctx = context or "property_write"
+        log_warn(
+            ctx .. " failed (object likely mid-destruction): " .. tostring(err),
+            once_key or ("safe_write_fail_" .. ctx),
+            true
+        )
     end
     return ok
 end
@@ -339,10 +344,10 @@ function M.set_fov_via_function(target_fov, overrideSteps)
 
         if step <= steps then
             local eased = quadratic(step, current_fov, target_fov - current_fov, steps)
-            local write_ok = Env.run_now("fov_transition_write", function()
+            local write_ok = safe_write(function()
                 cam.bManualCameraFovMode = true
                 cam.ManualCameraFov = eased
-            end)
+            end, "fov_transition_write")
             if not write_ok then
                 M._fov_transition_token = nil
                 M._active_target_fov = nil
@@ -356,7 +361,11 @@ function M.set_fov_via_function(target_fov, overrideSteps)
         end
     end
 
-    log_debug(string.format("Transition start: fov target=%.2f steps=%d", target_fov or 0, steps), "fov_transition_start")
+    log_debug(string.format(
+        "Transition start: fov target=%.2f, steps=%d (interpolation samples), step_delay_ms=1",
+        target_fov or 0,
+        steps
+    ), "fov_transition_start")
     Env.run_now("fov_transition_start", tick)
 end
 
@@ -477,11 +486,11 @@ function M.set_camera_relative_location(target_position, overrideSteps)
             return
         end
 
-        local write_ok = Env.run_now("camera_transition_write", function()
+        local write_ok = safe_write(function()
             l.X = eased.x
             l.Y = eased.y
             l.Z = eased.z
-        end)
+        end, "camera_transition_write")
         if not write_ok then
             finish()
             return
@@ -532,8 +541,15 @@ function M.set_camera_relative_location(target_position, overrideSteps)
         return
     end
 
-    log_debug(string.format("Transition start: camera pos=(%.2f,%.2f,%.2f) duration_ms=%.0f",
-        to.x or 0, to.y or 0, to.z or 0, duration_ms or 0), "camera_transition_start")
+    log_debug(string.format(
+        "Transition start: camera pos=(%.2f,%.2f,%.2f), duration_ms=%.0f (total blend time), steps_units=%d, unit_ms=%d",
+        to.x or 0,
+        to.y or 0,
+        to.z or 0,
+        duration_ms or 0,
+        steps_units or 0,
+        unit or 0
+    ), "camera_transition_start")
     Env.run_now("camera_transition_start", tick)
 end
 
@@ -609,10 +625,10 @@ function M.enforce_fov(target_fov)
     if actual == nil then return end
 
     if math_abs(actual - target_fov) > 0.5 then
-        Env.run_now("enforce_fov_write", function()
+        safe_write(function()
             cam.bManualCameraFovMode = true
             cam.ManualCameraFov = target_fov
-        end)
+        end, "enforce_fov_write")
     end
 end
 
@@ -766,11 +782,11 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
             local cam_now_any = cam_now
             local loc_now = cam_now_any.RelativeLocation
             if loc_now then
-                local write_ok = Env.run_now("lockon_exit_write_pos", function()
+                local write_ok = safe_write(function()
                     loc_now.X = (M._lockon_exit_from_pos.x or 0) + ((M._lockon_exit_to_pos.x or 0) - (M._lockon_exit_from_pos.x or 0)) * eased
                     loc_now.Y = (M._lockon_exit_from_pos.y or 0) + ((M._lockon_exit_to_pos.y or 0) - (M._lockon_exit_from_pos.y or 0)) * eased
                     loc_now.Z = (M._lockon_exit_from_pos.z or 0) + ((M._lockon_exit_to_pos.z or 0) - (M._lockon_exit_from_pos.z or 0)) * eased
-                end)
+                end, "lockon_exit_write_pos")
                 if not write_ok then
                     cancel_lockon_exit_blend()
                     return
@@ -779,10 +795,10 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
         end
 
         if M._lockon_exit_from_fov ~= nil and M._lockon_exit_to_fov ~= nil then
-            local fov_ok = Env.run_now("lockon_exit_write_fov", function()
+            local fov_ok = safe_write(function()
                 cam_now.bManualCameraFovMode = true
                 cam_now.ManualCameraFov = (M._lockon_exit_from_fov or 75) + (M._lockon_exit_to_fov - (M._lockon_exit_from_fov or 75)) * eased
-            end)
+            end, "lockon_exit_write_fov")
             if not fov_ok then
                 cancel_lockon_exit_blend()
                 return
@@ -799,11 +815,11 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
             local cam_now_any = cam_now
             local loc_now = cam_now_any.RelativeLocation
             if loc_now then
-                local final_pos_ok = Env.run_now("lockon_exit_finalize_pos", function()
+                local final_pos_ok = safe_write(function()
                     loc_now.X = M._lockon_exit_to_pos.x or 0
                     loc_now.Y = M._lockon_exit_to_pos.y or 0
                     loc_now.Z = M._lockon_exit_to_pos.z or 0
-                end)
+                end, "lockon_exit_finalize_pos")
                 if not final_pos_ok then
                     cancel_lockon_exit_blend()
                     return
@@ -812,10 +828,10 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
         end
 
         if M._lockon_exit_from_fov ~= nil and M._lockon_exit_to_fov ~= nil then
-            local final_fov_ok = Env.run_now("lockon_exit_finalize_fov", function()
+            local final_fov_ok = safe_write(function()
                 cam_now.bManualCameraFovMode = true
                 cam_now.ManualCameraFov = M._lockon_exit_to_fov
-            end)
+            end, "lockon_exit_finalize_fov")
             if not final_fov_ok then
                 cancel_lockon_exit_blend()
                 return
@@ -825,8 +841,12 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
         cancel_lockon_exit_blend()
     end
 
-    log_debug(string.format("Transition start: lockon_exit target_fov=%s duration_ms=%.0f",
-        tostring(to_fov), duration_ms or 0), "lockon_exit_start")
+    log_debug(string.format(
+        "Transition start: lockon_exit target_fov=%s, duration_ms=%.0f (total blend time), duration_s=%.3f",
+        tostring(to_fov),
+        duration_ms or 0,
+        (duration_ms or 0) / 1000.0
+    ), "lockon_exit_start")
     Env.run_now("lockon_exit_start", tick)
     return true
 end
@@ -902,11 +922,11 @@ function M.start_enforcement(pos, fov)
             if _enf_boom and obj_is_valid(_enf_boom) then
                 local to = _enf_boom.TargetOffset
                 if to then
-                    local pos_ok = Env.run_now("lockon_enforce_write_pos", function()
+                    local pos_ok = safe_write(function()
                         to.X = world_x
                         to.Y = world_y
                         to.Z = height
-                    end)
+                    end, "lockon_enforce_write_pos")
                     if not pos_ok then
                         _enforce_token = nil
                         clear_enforcement_caches()
@@ -924,7 +944,7 @@ function M.start_enforcement(pos, fov)
             local enf_cam_any = _enf_cam
             local rel_rot = obj_is_valid(enf_cam_any) and enf_cam_any.RelativeRotation or nil
             if rel_rot then
-                local rot_ok = Env.run_now("lockon_enforce_write_rot", function()
+                local rot_ok = safe_write(function()
                     if has_yaw then
                         rel_rot.Yaw = M._enforce_yaw_bias
                     end
@@ -933,7 +953,7 @@ function M.start_enforcement(pos, fov)
                         -- So we negate: positive config value = target UP
                         rel_rot.Pitch = -M._enforce_pitch_bias
                     end
-                end)
+                end, "lockon_enforce_write_rot")
                 if not rot_ok then
                     _enforce_token = nil
                     clear_enforcement_caches()
@@ -946,10 +966,10 @@ function M.start_enforcement(pos, fov)
         if M._enforce_fov then
             ---@type any
             local enf_cam_any = _enf_cam
-            local fov_ok = Env.run_now("lockon_enforce_write_fov", function()
+            local fov_ok = safe_write(function()
                 enf_cam_any.bManualCameraFovMode = true
                 enf_cam_any.ManualCameraFov = M._enforce_fov
-            end)
+            end, "lockon_enforce_write_fov")
             if not fov_ok then
                 _enforce_token = nil
                 clear_enforcement_caches()
