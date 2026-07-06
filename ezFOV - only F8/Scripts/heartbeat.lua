@@ -6,12 +6,12 @@ local os_clock = os.clock
 local math_floor = math.floor
 
 -- Local helper logging functions to prefix messages with the module name and enforce level
-local function log_warn(message, once_key, cache)
-    Logging.log_warn("Heartbeat", message, once_key, cache)
+local function log_error(message, once_key)
+    Logging.log_error("Heartbeat", message, once_key)
 end
 
-local function log_error(message, once_key, cache)
-    Logging.log_error("Heartbeat", message, once_key, cache)
+local function log_warn(message, once_key, cache)
+    Logging.log_warn("Heartbeat", message, once_key, cache)
 end
 
 local function log_debug(message, once_key, cache)
@@ -61,7 +61,7 @@ end
 
 function Heartbeat.pulse()
     if not Heartbeat or type(Heartbeat) ~= "table" then
-        log_error("Heartbeat.pulse() called but Heartbeat table is invalid.", "heartbeat_invalid", true)
+        log_error("Heartbeat.pulse() called but Heartbeat table is invalid.", "heartbeat_invalid")
         return
     end
 
