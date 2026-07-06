@@ -28,6 +28,7 @@ Heartbeat = {
     _buf = {}, _head = 1, _count = 0,
     _last_ms = 0,
     _drop_gen = 0,
+    _drop_token = nil,
 
     on_enabled = function() log_debug("Heartbeat enabled", "heartbeat_enabled") end,
     on_disabled = function() log_debug("Heartbeat disabled", "heartbeat_disabled") end,
@@ -80,7 +81,13 @@ function Heartbeat.pulse()
     local my = Heartbeat._drop_gen
     local drop_ms = Heartbeat.drop_ms
 
-    Env.run_after_delay(drop_ms, "heartbeat_drop", function()
+    if Heartbeat._drop_token then
+        Env.CancelDelay(Heartbeat._drop_token)
+        Heartbeat._drop_token = nil
+    end
+
+    Heartbeat._drop_token = Env.run_after_delay(drop_ms, "heartbeat_drop", function()
+        Heartbeat._drop_token = nil
         if my ~= Heartbeat._drop_gen then return end
         local since = now_ms() - (Heartbeat._last_ms or 0)
         if since < drop_ms - 1 then return end
@@ -101,6 +108,10 @@ function Heartbeat.set_thresholds(n, win_ms, drop_ms)
     if type(n)=="number" and n>=3 and n<=12 then Heartbeat.cap = math_floor(n) end
     if type(win_ms)=="number" and win_ms>=40 and win_ms<=200 then Heartbeat.enable_window_ms = math_floor(win_ms) end
     if type(drop_ms)=="number" and drop_ms>=120 and drop_ms<=1000 then Heartbeat.drop_ms = math_floor(drop_ms) end
+    if Heartbeat._drop_token then
+        Env.CancelDelay(Heartbeat._drop_token)
+        Heartbeat._drop_token = nil
+    end
     Heartbeat._reset_buf()
     Heartbeat.disabled = true
 end
