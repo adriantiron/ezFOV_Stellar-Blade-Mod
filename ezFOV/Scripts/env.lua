@@ -14,7 +14,7 @@ local Env = {
 local debug_traceback = debug and debug.traceback
 
 local function log_error(component, message, once_key)
-    Logging.log_error(component, message, once_key, true)
+    Logging.log_error(component, message, once_key)
 end
 
 local function format_error_with_trace(err)

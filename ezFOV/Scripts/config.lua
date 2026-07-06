@@ -40,13 +40,13 @@ local DEFAULTS = {
     LockOnPitchBias = 0,
 }
 
+local function log_error(message, once_key)
+    Logging.log_error("Config", message, once_key)
+end
+
 -- Local helper logging functions to prefix messages with the module name and enforce level
 local function log_warn(message, once_key, cache)
     Logging.log_warn("Config", message, once_key, cache)
-end
-
-local function log_error(message, once_key, cache)
-    Logging.log_error("Config", message, once_key, cache)
 end
 
 local function log_debug(message, once_key, cache)
@@ -221,7 +221,7 @@ function M.write()
         
         local cfg = M.get()
         if not cfg or type(cfg) ~= "table" then
-            log_error("Config file write failed because the runtime config is invalid.", "config_write_timer_missing_cfg", true)
+            log_error("Config file write failed because the runtime config is invalid.", "config_write_timer_missing_cfg")
             return
         end
 
@@ -399,14 +399,14 @@ function M.save_preset(num)
     end)
 
     if not ok then
-        log_error(format("Preset %d save failed: %s", num, tostring(err)), "preset_save_failed", true)
+        log_error(format("Preset %d save failed: %s", num, tostring(err)), "preset_save_failed")
     end
 end
 
 function M.load_preset(num)
     local cfg = M.get()
     if not cfg or type(cfg) ~= "table" or type(cfg.fovs) ~= "table" then
-        log_error(format("Preset %d load failed because the runtime config is invalid.", num), "preset_load_missing_cfg", true)
+        log_error(format("Preset %d load failed because the runtime config is invalid.", num), "preset_load_missing_cfg")
         return false
     end
 

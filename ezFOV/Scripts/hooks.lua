@@ -15,12 +15,12 @@ local last_state_change = 0
 local STATE_CHANGE_COOLDOWN = 0.3
 
 -- Local helper logging functions to prefix messages with the module name and enforce level
-local function log_warn(message, once_key, cache)
-    Logging.log_warn("Hooks", message, once_key, cache)
+local function log_error(message, once_key)
+    Logging.log_error("Hooks", message, once_key)
 end
 
-local function log_error(message, once_key, cache)
-    Logging.log_error("Hooks", message, once_key, cache)
+local function log_warn(message, once_key, cache)
+    Logging.log_warn("Hooks", message, once_key, cache)
 end
 
 local function log_debug(message, once_key, cache)
@@ -38,7 +38,7 @@ end
 
 function H.init(Camera, Config)
     if not Camera or not Config then
-        log_error("Hooks initialization aborted because the camera or config dependency was missing.", "hooks_init_missing_dependencies", true)
+        log_error("Hooks initialization aborted because the camera or config dependency was missing.", "hooks_init_missing_dependencies")
         return
     end
 
@@ -118,7 +118,7 @@ function H.init(Camera, Config)
                         if tps == false and inBattle == false then
                             local cfg = H.ConfigMod.get()
                             if not cfg or type(cfg) ~= "table" then
-                                log_error("Cold apply skipped because the runtime config is invalid.", "cold_apply_missing_cfg", true)
+                                log_error("Cold apply skipped because the runtime config is invalid.", "cold_apply_missing_cfg")
                                 return  -- Exits the pcall, not the hook
                             end
 

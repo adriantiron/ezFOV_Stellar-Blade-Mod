@@ -72,13 +72,13 @@ local _collision_warn_last = {
 }
 local _COLLISION_WARN_INTERVAL_SEC = 5.0
 
+local function log_error(message, once_key)
+    Logging.log_error("Camera", message, once_key)
+end
+
 -- Local helper logging functions to prefix messages with the module name and enforce level
 local function log_warn(message, once_key, cache)
     Logging.log_warn("Camera", message, once_key, cache)
-end
-
-local function log_error(message, once_key, cache)
-    Logging.log_error("Camera", message, once_key, cache)
 end
 
 local function log_debug(message, once_key, cache)
@@ -225,7 +225,7 @@ local function save_originals(snap)
     _saved_originals = {}
 
     if not snap then
-        log_error("Cannot save camera originals because the snapshot is unavailable.", "save_originals_no_snapshot", true)
+        log_error("Cannot save camera originals because the snapshot is unavailable.", "save_originals_no_snapshot")
         return
     end
 
@@ -564,7 +564,7 @@ end
 
 function M.init(cfg)
     if not cfg then
-        log_error("Camera initialization aborted because no config was provided.", "camera_init_missing_cfg", true)
+        log_error("Camera initialization aborted because no config was provided.", "camera_init_missing_cfg")
         return
     end
 
@@ -856,7 +856,7 @@ function M.start_enforcement(pos, fov)
     -- Read biases from config
     local cfg = require("config").get()
     if not cfg then
-        log_error("Lock-on enforcement could not start because the config module returned no data.", "enforcement_start_missing_cfg", true)
+        log_error("Lock-on enforcement could not start because the config module returned no data.", "enforcement_start_missing_cfg")
         return
     end
     M._enforce_yaw_bias   = cfg.LockOnYawBias   or 0
