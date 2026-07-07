@@ -10,6 +10,12 @@ local PlayerCtx = {
     _cam  = nil,
     _boom = nil,
     _on_disable = {},
+    LOCO_STATES = {
+        idle      = "idle",
+        slow_walk = "slow_walk",
+        walk      = "walk",
+        sprint    = "sprint",
+    },
 }
 
 -- Local helper logging functions to prefix messages with the module name and enforce level
@@ -371,13 +377,13 @@ function PlayerCtx.get_locomotion_state()
 
     local new_state
     if speed2D < 120 then
-        new_state = "idle"
+        new_state = PlayerCtx.LOCO_STATES.idle
     elseif speed2D < 240 then
-        new_state = "slow_walk"
+        new_state = PlayerCtx.LOCO_STATES.slow_walk
     elseif speed2D > 550 then
-        new_state = "sprint"
+        new_state = PlayerCtx.LOCO_STATES.sprint
     else
-        new_state = "walk"
+        new_state = PlayerCtx.LOCO_STATES.walk
     end
 
     local now = os.clock()

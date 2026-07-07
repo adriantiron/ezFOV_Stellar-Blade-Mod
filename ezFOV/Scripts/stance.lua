@@ -9,6 +9,15 @@ local M = {
     _min_dt          = 0.10,
     _applied_profile = nil,
     _applied_fov     = nil,
+    PROFILES = {
+        default = "default",
+        tps     = "tps",
+        lockon  = "lockon",
+        battle  = "battle",
+        idle    = "idle",
+        walk    = "walk",
+        sprint  = "sprint",
+    },
 }
 
 local Camera, Config
@@ -61,22 +70,22 @@ local function ready()
 end
 
 local function choose_profile(state, cfg)
-    if not state or type(state) ~= "table" then return "default" end
-    if state.tps == true then return "tps" end
+    if not state or type(state) ~= "table" then return M.PROFILES.default end
+    if state.tps == true then return M.PROFILES.tps end
 	
 	local current_cfg = cfg or (Config and Config.get())
     if not current_cfg or type(current_cfg) ~= "table" or type(current_cfg.fovs) ~= "table" then
         log_error("Profile selection aborted because the runtime config is invalid.", "stance_choose_profile_missing_cfg")
-        return "default"
+        return M.PROFILES.default
     end
 
     if state.lockon == true and current_cfg.EnableLockOnCamera then
         _lockon_last_true = os.clock()
         _grace_logged = false
-        return "lockon"
+        return M.PROFILES.lockon
     end
 
-    if M._applied_profile == "lockon" and current_cfg.EnableLockOnCamera then
+    if M._applied_profile == M.PROFILES.lockon and current_cfg.EnableLockOnCamera then
         local since_last = os.clock() - _lockon_last_true
         if since_last < _LOCKON_EXIT_GRACE then
             if not _grace_logged then
@@ -84,25 +93,25 @@ local function choose_profile(state, cfg)
                 log_debug(string.format("Lock-on grace period active (%.0fms remaining)",
                     (_LOCKON_EXIT_GRACE - since_last) * 1000), "lockon_grace_active")
             end
-            return "lockon"
+            return M.PROFILES.lockon
         end
         log_debug("Lock-on grace period expired, exiting lock-on", "lockon_grace_expired")
     end
 
-    if state.battle == true                                then return "battle"  end
-    if state.locomotion == "sprint" and current_cfg.EnableSprintingCamera then return "sprint" end
-    if state.locomotion == "idle" and current_cfg.EnableIdleCamera then return "idle"   end
-    if state.locomotion == "slow_walk" and current_cfg.EnableWalkingCamera then return "walk"   end
-    return "default"
+    if state.battle == true                                then return M.PROFILES.battle  end
+    if state.locomotion == PlayerCtx.LOCO_STATES.sprint and current_cfg.EnableSprintingCamera then return M.PROFILES.sprint end
+    if state.locomotion == PlayerCtx.LOCO_STATES.idle and current_cfg.EnableIdleCamera then return M.PROFILES.idle   end
+    if state.locomotion == PlayerCtx.LOCO_STATES.slow_walk and current_cfg.EnableWalkingCamera then return M.PROFILES.walk   end
+    return M.PROFILES.default
 end
 
 local function fov_for_profile(profile, cfg)
-    if profile == "tps"    then return cfg.fovs.tps    or cfg.fovs.fov end
-    if profile == "lockon" then return cfg.fovs.lockon or cfg.fovs.combat or cfg.fovs.fov end
-    if profile == "battle" then return cfg.fovs.combat or cfg.fovs.fov end
-    if profile == "idle"   then return cfg.fovs.idle   or cfg.fovs.fov end
-    if profile == "walk"   then return cfg.fovs.walk   or cfg.fovs.fov end
-    if profile == "sprint" then return cfg.fovs.sprint or cfg.fovs.fov end
+    if profile == M.PROFILES.tps    then return cfg.fovs.tps    or cfg.fovs.fov end
+    if profile == M.PROFILES.lockon then return cfg.fovs.lockon or cfg.fovs.combat or cfg.fovs.fov end
+    if profile == M.PROFILES.battle then return cfg.fovs.combat or cfg.fovs.fov end
+    if profile == M.PROFILES.idle   then return cfg.fovs.idle   or cfg.fovs.fov end
+    if profile == M.PROFILES.walk   then return cfg.fovs.walk   or cfg.fovs.fov end
+    if profile == M.PROFILES.sprint then return cfg.fovs.sprint or cfg.fovs.fov end
     return cfg.fovs.fov
 end
 
@@ -127,14 +136,14 @@ local function apply_fov_transition(target_fov, steps_override)
 end
 
 local function apply_position_for_profile(profile, cfg, steps_override)
-    if profile == "lockon" or profile == "tps" then return end
+    if profile == M.PROFILES.lockon or profile == M.PROFILES.tps then return end
 
     local pos = nil
-    if     profile == "battle"  then pos = cfg.CombatPosition
-    elseif profile == "sprint"  then pos = cfg.SprintPosition
-    elseif profile == "idle"    then pos = cfg.IdlePosition
-    elseif profile == "walk"    then pos = cfg.WalkPosition
-    elseif profile == "default" then pos = cfg.DefaultPosition
+    if     profile == M.PROFILES.battle  then pos = cfg.CombatPosition
+    elseif profile == M.PROFILES.sprint  then pos = cfg.SprintPosition
+    elseif profile == M.PROFILES.idle    then pos = cfg.IdlePosition
+    elseif profile == M.PROFILES.walk    then pos = cfg.WalkPosition
+    elseif profile == M.PROFILES.default then pos = cfg.DefaultPosition
     end
 
     if pos then
@@ -155,12 +164,12 @@ local function apply_profile(profile, cfg)
     local prev = M._applied_profile
     M._applied_profile = profile
 
-    if profile == "lockon" then
+    if profile == M.PROFILES.lockon then
         if not Camera or not Camera.start_enforcement then
             log_error("Unable to enter lock-on mode because the camera module is unavailable.", "stance_missing_camera_start")
             return
         end
-        local fov = fov_for_profile("lockon", cfg)
+        local fov = fov_for_profile(M.PROFILES.lockon, cfg)
         M._applied_fov = fov
         Camera.start_enforcement(cfg.LockOnPosition, fov)
         return
@@ -170,21 +179,21 @@ local function apply_profile(profile, cfg)
     local steps_override = nil
 
     -- 1. Slow down transitions IF the target profile is a traversal or resting state
-    if profile == "walk" or profile == "sprint" or profile == "idle" then
+    if profile == M.PROFILES.walk or profile == M.PROFILES.sprint or profile == M.PROFILES.idle then
         steps_override = slow_steps
     -- 2. Slow down transitions IF we are exiting a traversal or resting state back to default/combat
-    elseif profile == "default" and (prev == "walk" or prev == "sprint" or prev == "idle") then
+    elseif profile == M.PROFILES.default and (prev == M.PROFILES.walk or prev == M.PROFILES.sprint or prev == M.PROFILES.idle) then
         steps_override = slow_steps
     end
 
-    if prev == "lockon" and Camera and Camera.begin_lockon_exit_blend then
+    if prev == M.PROFILES.lockon and Camera and Camera.begin_lockon_exit_blend then
         local target_fov = fov_for_profile(profile, cfg)
         local target_pos = nil
-        if     profile == "battle"  then target_pos = cfg.CombatPosition
-        elseif profile == "sprint"  then target_pos = cfg.SprintPosition
-        elseif profile == "idle"    then target_pos = cfg.IdlePosition
-        elseif profile == "walk"    then target_pos = cfg.WalkPosition
-        elseif profile == "default" then target_pos = cfg.DefaultPosition
+        if     profile == M.PROFILES.battle  then target_pos = cfg.CombatPosition
+        elseif profile == M.PROFILES.sprint  then target_pos = cfg.SprintPosition
+        elseif profile == M.PROFILES.idle    then target_pos = cfg.IdlePosition
+        elseif profile == M.PROFILES.walk    then target_pos = cfg.WalkPosition
+        elseif profile == M.PROFILES.default then target_pos = cfg.DefaultPosition
         end
 
         Env.run_on_game_thread("stance_lockon_exit_blend", function()
@@ -207,7 +216,7 @@ local function apply_profile(profile, cfg)
 end
 
 function M.get_current_profile()
-    return M._applied_profile or "default"
+    return M._applied_profile or M.PROFILES.default
 end
 
 function M.reset_state()
@@ -244,7 +253,7 @@ function M.pulse()
 
     apply_profile(profile, cfg)
 
-    if M._applied_profile == "lockon" then
+    if M._applied_profile == M.PROFILES.lockon then
         return
     end
 
