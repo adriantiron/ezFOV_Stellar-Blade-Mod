@@ -45,7 +45,6 @@ local restore_originals -- Forward declaration to fix the visibility crash!
 local _transition_busy   = false
 local _queued_transition = nil
 local _enforce_token     = nil
-local _enforce_recovery_tripped = false
 
 local _originals_saved = false
 local _saved_originals = {}
@@ -991,8 +990,9 @@ function M.start_enforcement(pos, fov)
                 end
             end
 
-            if _enf_boom and obj_is_valid(_enf_boom) then
-                local to = _enf_boom.TargetOffset
+            local boom_ref = _enf_boom
+            if boom_ref and obj_is_valid(boom_ref) then
+                local to = boom_ref.TargetOffset
                 if to then
                     lockon_diag_debug("success", string.format(
                         "Lock-on position attempting TargetOffset write: target=(%.2f, %.2f, %.2f)",
