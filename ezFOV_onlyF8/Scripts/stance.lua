@@ -91,11 +91,11 @@ local function choose_profile(state, cfg)
             if not _grace_logged then
                 _grace_logged = true
                 log_debug(string.format("Lock-on grace period active (%.0fms remaining)",
-                    (_LOCKON_EXIT_GRACE - since_last) * 1000), "lockon_grace_active")
+                    (_LOCKON_EXIT_GRACE - since_last) * 1000), "lockon_grace_active", true)
             end
             return M.PROFILES.lockon
         end
-        log_debug("Lock-on grace period expired, exiting lock-on", "lockon_grace_expired")
+        log_debug("Lock-on grace period expired, exiting lock-on", "lockon_grace_expired", true)
     end
 
     if state.battle == true                                then return M.PROFILES.battle  end
@@ -158,24 +158,51 @@ local function apply_position_for_profile(profile, cfg, steps_override)
     end
 end
 
+local function apply_lockon_profile(cfg)
+    if not Camera or not Camera.start_enforcement then
+        log_error("Unable to enter lock-on mode because the camera module is unavailable.", "stance_missing_camera_start")
+        return
+    end
+
+    local fov = fov_for_profile(M.PROFILES.lockon, cfg)
+    M._applied_fov = fov
+
+    if Camera.is_enforcing and Camera.is_enforcing() then
+        if Camera.update_enforcement_pos then
+            Camera.update_enforcement_pos(cfg.LockOnPosition)
+        end
+        if Camera.update_enforcement_fov then
+            Camera.update_enforcement_fov(fov)
+        end
+        if Camera.update_enforcement_yaw_bias then
+            Camera.update_enforcement_yaw_bias(cfg.LockOnYawBias or 0)
+        end
+        if Camera.update_enforcement_pitch_bias then
+            Camera.update_enforcement_pitch_bias(cfg.LockOnPitchBias or 0)
+        end
+        return
+    end
+
+    Camera.start_enforcement(cfg.LockOnPosition, fov)
+end
+
 local function apply_profile(profile, cfg)
-    if profile == M._applied_profile then return end
+    if profile == M._applied_profile then
+        if profile == M.PROFILES.lockon then
+            apply_lockon_profile(cfg)
+        end
+        return
+    end
 
     local prev = M._applied_profile
     M._applied_profile = profile
 
     if profile == M.PROFILES.lockon then
-        if not Camera or not Camera.start_enforcement then
-            log_error("Unable to enter lock-on mode because the camera module is unavailable.", "stance_missing_camera_start")
-            return
-        end
-        local fov = fov_for_profile(M.PROFILES.lockon, cfg)
-        M._applied_fov = fov
-        Camera.start_enforcement(cfg.LockOnPosition, fov)
+        apply_lockon_profile(cfg)
         return
     end
 
-    local slow_steps = 150
+    local slow_steps = 100
     local steps_override = nil
 
     -- 1. Slow down transitions IF the target profile is a traversal or resting state
