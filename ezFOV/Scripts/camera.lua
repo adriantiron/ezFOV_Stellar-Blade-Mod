@@ -70,7 +70,16 @@ local _collision_warn_last = {
     midthread_snapshot = 0,
     missing_boom = 0,
 }
+local _lockon_diag_last = {
+    branch = 0,
+    collapsed = 0,
+    success = 0,
+    invalid_boom = 0,
+    missing_target_offset = 0,
+    missing_refs = 0,
+}
 local _COLLISION_WARN_INTERVAL_SEC = 5.0
+local _LOCKON_DIAG_INTERVAL_SEC = 0.75
 
 local function log_error(message, once_key)
     Logging.log_error("Camera", message, once_key)
@@ -115,6 +124,30 @@ local function collision_warn_throttled(slot, message)
     log_warn(message)
 end
 
+local function lockon_diag_debug(slot, message)
+    local now = os_clock()
+    local last = _lockon_diag_last[slot] or 0
+    if (now - last) < _LOCKON_DIAG_INTERVAL_SEC then return end
+    _lockon_diag_last[slot] = now
+    log_debug(message, "lockon_diag_" .. tostring(slot), true)
+end
+
+local function lockon_diag_warn(slot, message)
+    local now = os_clock()
+    local last = _lockon_diag_last[slot] or 0
+    if (now - last) < _LOCKON_DIAG_INTERVAL_SEC then return end
+    _lockon_diag_last[slot] = now
+    log_warn(message)
+end
+
+local function lockon_diag_ref_loss(slot, message, miss_count)
+    if (miss_count or 0) >= 3 then
+        lockon_diag_warn(slot, message)
+        return
+    end
+    lockon_diag_debug(slot, message)
+end
+
 -- ==================== Yaw reading ====================
 
 local function get_camera_yaw_raw(snap)
@@ -131,21 +164,21 @@ local function get_camera_yaw_raw(snap)
     local ok1, rot1 = pcall(function() return snap.pc:GetControlRotation() end)
     if ok1 and rot1 and rot1.Yaw ~= nil then
         _yaw_fn = function(s) return s.pc:GetControlRotation().Yaw end
-        log_debug("Yaw source resolved via GetControlRotation()", "yaw_source_rotation")
+        log_debug("Yaw source resolved via GetControlRotation()", "yaw_source_rotation", true)
         return tonumber(rot1.Yaw) or 0
     end
 
     local ok2, rot2 = pcall(function() return snap.boom:K2_GetComponentRotation() end)
     if ok2 and rot2 and rot2.Yaw ~= nil then
         _yaw_fn = function(s) return s.boom:K2_GetComponentRotation().Yaw end
-        log_debug("Yaw source resolved via boom K2_GetComponentRotation()", "yaw_source_boom")
+        log_debug("Yaw source resolved via boom K2_GetComponentRotation()", "yaw_source_boom", true)
         return tonumber(rot2.Yaw) or 0
     end
 
     local ok3, rot3 = pcall(function() return snap.cam:K2_GetComponentRotation() end)
     if ok3 and rot3 and rot3.Yaw ~= nil then
         _yaw_fn = function(s) return s.cam:K2_GetComponentRotation().Yaw end
-        log_debug("Yaw source resolved via cam K2_GetComponentRotation()", "yaw_source_cam")
+        log_debug("Yaw source resolved via cam K2_GetComponentRotation()", "yaw_source_cam", true)
         return tonumber(rot3.Yaw) or 0
     end
 
@@ -634,12 +667,32 @@ local function enf_validate_refs()
         _enf_cam  = nil
         _enf_boom = nil
         _enf_pawn = nil
+        lockon_diag_ref_loss("missing_refs", "Lock-on enforcement could not refresh refs because PlayerCtx.get_snapshot() returned nil.", _enforce_miss_count + 1)
         return false
     end
 
     _enf_cam  = snap.cam
-    _enf_boom = snap.boom
     _enf_pawn = snap.pawn
+
+    local boom = snap.boom
+    if not obj_is_valid(boom) and PlayerCtx.get_camera_boom then
+        boom = PlayerCtx.get_camera_boom()
+    end
+
+    if not obj_is_valid(_enf_cam)
+       or not obj_is_valid(_enf_pawn)
+       or not obj_is_valid(boom) then
+        _enf_boom = nil
+        lockon_diag_ref_loss("missing_refs", string.format(
+            "Lock-on enforcement refs incomplete after refresh: cam=%s pawn=%s boom=%s",
+            tostring(obj_is_valid(_enf_cam)),
+            tostring(obj_is_valid(_enf_pawn)),
+            tostring(obj_is_valid(boom))
+        ), _enforce_miss_count + 1)
+        return false
+    end
+
+    _enf_boom = boom
     save_originals(snap)
     return true
 end
@@ -869,6 +922,15 @@ function M.start_enforcement(pos, fov)
     if _enforce_token then return end
 
     local function loop()
+        local function retry_after_ref_loss(slot, message)
+            if message then
+                lockon_diag_ref_loss(slot, message, _enforce_miss_count + 1)
+            end
+            clear_enforcement_caches()
+            _enforce_miss_count = math_min(_enforce_miss_count + 1, 4)
+            _enforce_token = Env.run_after_delay(_ENFORCE_RETRY_MS * _enforce_miss_count, "lockon_enforce_retry", loop)
+        end
+
         if not M._enforce_pos and not M._enforce_fov then
             _enforce_token = nil
             clear_enforcement_caches()
@@ -901,9 +963,43 @@ function M.start_enforcement(pos, fov)
             local world_x = lateral * right_x + depth * fwd_x
             local world_y = lateral * right_y + depth * fwd_y
 
+            lockon_diag_debug("branch", string.format(
+                "Lock-on position branch reached: enforce=(%.2f, %.2f, %.2f) sin=%.4f cos=%.4f world=(%.2f, %.2f, %.2f)",
+                lateral,
+                depth,
+                height,
+                sin_y or 0,
+                cos_y or 0,
+                world_x,
+                world_y,
+                height
+            ))
+
+            if math_abs(lateral) > 0.01 or math_abs(depth) > 0.01 then
+                if math_abs(world_x) <= 0.01 and math_abs(world_y) <= 0.01 then
+                    lockon_diag_warn("collapsed", string.format(
+                        "Lock-on position math collapsed to near-zero world offset: enforce=(%.2f, %.2f, %.2f) sin=%.4f cos=%.4f world=(%.2f, %.2f, %.2f)",
+                        lateral,
+                        depth,
+                        height,
+                        sin_y or 0,
+                        cos_y or 0,
+                        world_x,
+                        world_y,
+                        height
+                    ))
+                end
+            end
+
             if _enf_boom and obj_is_valid(_enf_boom) then
                 local to = _enf_boom.TargetOffset
                 if to then
+                    lockon_diag_debug("success", string.format(
+                        "Lock-on position attempting TargetOffset write: target=(%.2f, %.2f, %.2f)",
+                        world_x,
+                        world_y,
+                        height
+                    ))
                     local pos_ok = safe_write(function()
                         to.X = world_x
                         to.Y = world_y
@@ -914,7 +1010,13 @@ function M.start_enforcement(pos, fov)
                         clear_enforcement_caches()
                         return
                     end
+                else
+                    retry_after_ref_loss("missing_target_offset", "Lock-on enforcement could not write position because boom.TargetOffset is unavailable.")
+                    return
                 end
+            else
+                retry_after_ref_loss("invalid_boom", "Lock-on enforcement could not write position because the boom reference is invalid.")
+                return
             end
         end
 
@@ -924,6 +1026,10 @@ function M.start_enforcement(pos, fov)
         if has_yaw or has_pitch then
             ---@type any
             local enf_cam_any = _enf_cam
+            if not obj_is_valid(enf_cam_any) then
+                retry_after_ref_loss("missing_refs", "Lock-on enforcement could not write rotation because the camera reference is invalid.")
+                return
+            end
             local rel_rot = obj_is_valid(enf_cam_any) and enf_cam_any.RelativeRotation or nil
             if rel_rot then
                 local rot_ok = safe_write(function()
@@ -948,6 +1054,10 @@ function M.start_enforcement(pos, fov)
         if M._enforce_fov then
             ---@type any
             local enf_cam_any = _enf_cam
+            if not obj_is_valid(enf_cam_any) then
+                retry_after_ref_loss("missing_refs", "Lock-on enforcement could not write FOV because the camera reference is invalid.")
+                return
+            end
             local fov_ok = safe_write(function()
                 enf_cam_any.bManualCameraFovMode = true
                 enf_cam_any.ManualCameraFov = M._enforce_fov
