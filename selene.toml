@@ -1,0 +1,11 @@
+# selene configuration for the ezFOV mod (dev-only tooling).
+# Uses a custom standard library (ue4ss.yml) describing the globals that UE4SS
+# injects at runtime, so they are not reported as undefined variables.
+# Docs: https://kampfkarren.github.io/selene/
+
+std = "ue4ss"
+
+[rules]
+# Flag variables accidentally leaked into the global scope (a missing `local`).
+# This surfaces real bugs such as an implicit global table or reset flag.
+unscoped_variables = "warn"

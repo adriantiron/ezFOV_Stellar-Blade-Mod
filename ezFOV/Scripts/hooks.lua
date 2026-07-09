@@ -1,8 +1,8 @@
 local PlayerCtx = require("playercontext")
 local Heartbeat = require("heartbeat")
-local Stance    = require("stance")
-local Env       = require("env").bind("Hooks")
-local Logging   = require("logging")
+local Stance = require("stance")
+local Env = require("env").bind("Hooks")
+local Logging = require("logging")
 
 local os_clock = os.clock
 
@@ -58,17 +58,29 @@ local function cancel_post_cold_pulse_timer()
 end
 
 local function is_bootstrap_debug_enabled()
-    if DEBUG_BOOTSTRAP_STATE_MACHINE == true then return true end
-    if not H.ConfigMod or type(H.ConfigMod.get) ~= "function" then return false end
+    if DEBUG_BOOTSTRAP_STATE_MACHINE == true then
+        return true
+    end
+    if not H.ConfigMod or type(H.ConfigMod.get) ~= "function" then
+        return false
+    end
     local cfg = H.ConfigMod.get()
     return cfg and cfg.DebugBootstrapStateMachine == true
 end
 
 local function is_valid_bootstrap_transition(from_state, to_state)
-    if from_state == to_state then return true end
-    if to_state == BOOTSTRAP_IDLE then return true end
-    if from_state == BOOTSTRAP_IDLE and to_state == BOOTSTRAP_COLD_PENDING then return true end
-    if from_state == BOOTSTRAP_COLD_PENDING and to_state == BOOTSTRAP_WAIT_POST_PULSE then return true end
+    if from_state == to_state then
+        return true
+    end
+    if to_state == BOOTSTRAP_IDLE then
+        return true
+    end
+    if from_state == BOOTSTRAP_IDLE and to_state == BOOTSTRAP_COLD_PENDING then
+        return true
+    end
+    if from_state == BOOTSTRAP_COLD_PENDING and to_state == BOOTSTRAP_WAIT_POST_PULSE then
+        return true
+    end
     return false
 end
 
@@ -76,18 +88,30 @@ local function set_bootstrap_state(new_state, reason)
     local prev = Bootstrap.state
     Bootstrap.state = new_state
 
-    if not is_bootstrap_debug_enabled() then return end
+    if not is_bootstrap_debug_enabled() then
+        return
+    end
 
     if is_valid_bootstrap_transition(prev, new_state) then
         log_debug(
-            "Bootstrap transition " .. tostring(prev) .. " -> " .. tostring(new_state)
-                .. " (" .. tostring(reason or "unspecified") .. ")",
+            "Bootstrap transition "
+                .. tostring(prev)
+                .. " -> "
+                .. tostring(new_state)
+                .. " ("
+                .. tostring(reason or "unspecified")
+                .. ")",
             "bootstrap_transition_" .. tostring(prev) .. "_to_" .. tostring(new_state)
         )
     else
         log_warn(
-            "Bootstrap INVALID transition " .. tostring(prev) .. " -> " .. tostring(new_state)
-                .. " (" .. tostring(reason or "unspecified") .. ")",
+            "Bootstrap INVALID transition "
+                .. tostring(prev)
+                .. " -> "
+                .. tostring(new_state)
+                .. " ("
+                .. tostring(reason or "unspecified")
+                .. ")",
             "bootstrap_invalid_transition_" .. tostring(prev) .. "_to_" .. tostring(new_state),
             true
         )
@@ -112,10 +136,14 @@ end
 
 local function queue_post_cold_pulse()
     cancel_post_cold_pulse_timer()
-    Bootstrap.post_pulse_token = Env.run_after_delay(POST_COLD_APPLY_PULSE_DELAY_MS, "post_cold_apply_stance_pulse", function()
-        Bootstrap.post_pulse_token = nil
-        Bootstrap.post_pulse_requested = true
-    end)
+    Bootstrap.post_pulse_token = Env.run_after_delay(
+        POST_COLD_APPLY_PULSE_DELAY_MS,
+        "post_cold_apply_stance_pulse",
+        function()
+            Bootstrap.post_pulse_token = nil
+            Bootstrap.post_pulse_requested = true
+        end
+    )
 end
 
 local function should_run_queued_post_pulse()
@@ -133,18 +161,31 @@ end
 
 function H.defer_stance_pulse(duration_ms, reason)
     local ms = tonumber(duration_ms) or RELOAD_DEFER_DEFAULT_MS
-    if ms < 0 then ms = 0 end
+    if ms < 0 then
+        ms = 0
+    end
     -- Wrapper blocks while (now - last_state_change) < STATE_CHANGE_COOLDOWN,
     -- so shift by cooldown to make external defer duration match requested ms.
     last_state_change = os_clock() + (ms / 1000.0) - STATE_CHANGE_COOLDOWN
-    log_debug("Hooks stance pulse deferred for " .. tostring(math.floor(ms)) .. "ms (" .. tostring(reason or "unspecified") .. ")", "hooks_defer_stance_pulse", true)
+    log_debug(
+        "Hooks stance pulse deferred for "
+            .. tostring(math.floor(ms))
+            .. "ms ("
+            .. tostring(reason or "unspecified")
+            .. ")",
+        "hooks_defer_stance_pulse",
+        true
+    )
 end
 
 function H.init(Camera, Config)
     log_debug("Hooks init: starting initialization", "hooks_init_start")
 
     if not Camera or not Config then
-        log_error("Hooks initialization aborted because the camera or config dependency was missing.", "hooks_init_missing_dependencies")
+        log_error(
+            "Hooks initialization aborted because the camera or config dependency was missing.",
+            "hooks_init_missing_dependencies"
+        )
         return
     end
 
@@ -153,7 +194,7 @@ function H.init(Camera, Config)
         return
     end
 
-    H.Camera    = Camera
+    H.Camera = Camera
     H.ConfigMod = Config
     reset_bootstrap()
 
@@ -198,8 +239,12 @@ function H.init(Camera, Config)
                 if H.Camera and H.Camera.stop_enforcement then
                     H.Camera.stop_enforcement()
                 end
-                if PlayerCtx.clear_caches then PlayerCtx.clear_caches() end
-                if Stance.reset_state then Stance.reset_state() end
+                if PlayerCtx.clear_caches then
+                    PlayerCtx.clear_caches()
+                end
+                if Stance.reset_state then
+                    Stance.reset_state()
+                end
                 reset_bootstrap()
             end)
             return nil -- GUARDRAIL: Prevent UE return value override
@@ -207,8 +252,10 @@ function H.init(Camera, Config)
     )
 
     log_debug(
-        "Hooks init: ClientRestart hook registered pre=" .. tostring(H._hook_ids.client_restart.pre_id)
-            .. " post=" .. tostring(H._hook_ids.client_restart.post_id),
+        "Hooks init: ClientRestart hook registered pre="
+            .. tostring(H._hook_ids.client_restart.pre_id)
+            .. " post="
+            .. tostring(H._hook_ids.client_restart.post_id),
         "hooks_init_clientrestart_registered"
     )
 
@@ -229,14 +276,17 @@ function H.init(Camera, Config)
 
                 if not Bootstrap.cold_applied and Bootstrap.state == BOOTSTRAP_IDLE then
                     if not PlayerCtx.camera_or_pc_invalid() then
-                        local tps      = PlayerCtx.is_tps_mode()
+                        local tps = PlayerCtx.is_tps_mode()
                         local inBattle = PlayerCtx.is_battle()
 
                         if tps == false and inBattle == false then
                             local cfg = H.ConfigMod.get()
                             if not cfg or type(cfg) ~= "table" then
-                                log_error("Cold apply skipped because the runtime config is invalid.", "cold_apply_missing_cfg")
-                                return  -- Exits the pcall, not the hook
+                                log_error(
+                                    "Cold apply skipped because the runtime config is invalid.",
+                                    "cold_apply_missing_cfg"
+                                )
+                                return -- Exits the pcall, not the hook
                             end
 
                             begin_cold_apply_bootstrap()
@@ -270,10 +320,11 @@ function H.init(Camera, Config)
     )
 
     log_debug(
-        "Hooks init: IsBlockingMode hook registered pre=" .. tostring(H._hook_ids.blocking_mode.pre_id)
-            .. " post=" .. tostring(H._hook_ids.blocking_mode.post_id),
+        "Hooks init: IsBlockingMode hook registered pre="
+            .. tostring(H._hook_ids.blocking_mode.pre_id)
+            .. " post="
+            .. tostring(H._hook_ids.blocking_mode.post_id),
         "hooks_init_blocking_registered"
-
     )
 
     H._initialized = true

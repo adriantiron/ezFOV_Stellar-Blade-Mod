@@ -56,7 +56,11 @@ end
 function Env.run_on_game_thread(component, context, fn)
     local execute = Env.ExecuteInGameThread
     if type(execute) ~= "function" then
-        log_error(component, context .. " failed because ExecuteInGameThread is unavailable.", context .. "_missing_thread_api")
+        log_error(
+            component,
+            context .. " failed because ExecuteInGameThread is unavailable.",
+            context .. "_missing_thread_api"
+        )
         return false
     end
 
@@ -72,7 +76,11 @@ end
 function Env.run_after_delay(component, delay_ms, context, fn)
     local execute = Env.ExecuteWithDelay
     if type(execute) ~= "function" then
-        log_error(component, context .. " failed because ExecuteWithDelay is unavailable.", context .. "_missing_delay_api")
+        log_error(
+            component,
+            context .. " failed because ExecuteWithDelay is unavailable.",
+            context .. "_missing_delay_api"
+        )
         return nil
     end
 
@@ -84,7 +92,11 @@ end
 function Env.register_safe_keybind(component, key, modifiers, label, fn)
     local register = Env.RegisterKeyBindAsync
     if type(register) ~= "function" then
-        log_error(component, "Keybind registration skipped because RegisterKeyBindAsync is unavailable.", "keybind_register_missing_api")
+        log_error(
+            component,
+            "Keybind registration skipped because RegisterKeyBindAsync is unavailable.",
+            "keybind_register_missing_api"
+        )
         return
     end
 
@@ -101,17 +113,29 @@ function Env.safe_register_hook(component, func_path, pre_cb, post_cb)
     end
 
     if type(func_path) ~= "string" or func_path == "" then
-        log_error(component, "RegisterHook skipped because the function path was invalid.", "hooks_registerhook_invalid_path")
+        log_error(
+            component,
+            "RegisterHook skipped because the function path was invalid.",
+            "hooks_registerhook_invalid_path"
+        )
         return nil, nil
     end
 
     if type(pre_cb) ~= "function" then
-        log_error(component, "RegisterHook skipped because the pre-callback was invalid.", "hooks_registerhook_invalid_pre_cb")
+        log_error(
+            component,
+            "RegisterHook skipped because the pre-callback was invalid.",
+            "hooks_registerhook_invalid_pre_cb"
+        )
         return nil, nil
     end
 
     if post_cb ~= nil and type(post_cb) ~= "function" then
-        log_error(component, "RegisterHook skipped because the post-callback was invalid.", "hooks_registerhook_invalid_post_cb")
+        log_error(
+            component,
+            "RegisterHook skipped because the post-callback was invalid.",
+            "hooks_registerhook_invalid_post_cb"
+        )
         return nil, nil
     end
 
@@ -128,7 +152,9 @@ end
 
 function Env.safe_unregister_hook(component, entry)
     local unregister = Env.UnregisterHook
-    if not entry or not unregister then return end
+    if not entry or not unregister then
+        return
+    end
     if entry.pre_id ~= nil or entry.post_id ~= nil then
         run_guarded(component, "hooks_unregisterhook", "hook", function()
             unregister(entry.path, entry.pre_id, entry.post_id)

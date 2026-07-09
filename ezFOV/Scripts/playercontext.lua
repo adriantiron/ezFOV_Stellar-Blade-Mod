@@ -1,20 +1,20 @@
 local Heartbeat = require("heartbeat")
-local Logging   = require("logging")
+local Logging = require("logging")
 
 local math_sqrt = math.sqrt
 
 local PlayerCtx = {
     _disabled = true,
-    _pc   = nil,
+    _pc = nil,
     _pawn = nil,
-    _cam  = nil,
+    _cam = nil,
     _boom = nil,
     _on_disable = {},
     LOCO_STATES = {
-        idle      = "idle",
+        idle = "idle",
         slow_walk = "slow_walk",
-        walk      = "walk",
-        sprint    = "sprint",
+        walk = "walk",
+        sprint = "sprint",
     },
 }
 
@@ -33,9 +33,9 @@ end
 -- ========================================================================================
 
 local function _drop_caches()
-    PlayerCtx._pc   = nil
+    PlayerCtx._pc = nil
     PlayerCtx._pawn = nil
-    PlayerCtx._cam  = nil
+    PlayerCtx._cam = nil
     PlayerCtx._boom = nil
 end
 
@@ -44,43 +44,54 @@ local function clear_pawn_caches()
     PlayerCtx._pawn = nil
     PlayerCtx._cam = nil
     PlayerCtx._boom = nil
-end    
+end
 
 local function _notify_disable()
     for i = 1, #PlayerCtx._on_disable do
         local ok, err = pcall(PlayerCtx._on_disable[i])
-        if not ok then log_error("on_disable handler error: " .. tostring(err), "on_disable_handler_error") end
+        if not ok then
+            log_error("on_disable handler error: " .. tostring(err), "on_disable_handler_error")
+        end
     end
 end
 
 local function obj_is_valid(obj)
-    if not obj then return false end
-    if type(obj.IsValid) ~= "function" then return true end
-    local ok, valid = pcall(function() return obj:IsValid() end)
+    if not obj then
+        return false
+    end
+    if type(obj.IsValid) ~= "function" then
+        return true
+    end
+    local ok, valid = pcall(function()
+        return obj:IsValid()
+    end)
     return ok and valid == true
 end
 
-local _lockon_fn    = nil
+local _lockon_fn = nil
 local _lockon_tried = false
-local _lockon_pawn  = nil
+local _lockon_pawn = nil
 
 local function clear_lockon_caches()
-    _lockon_fn    = nil
+    _lockon_fn = nil
     _lockon_tried = false
-    _lockon_pawn  = nil
+    _lockon_pawn = nil
 end
 
-
-local _hb_enabled_prev  = Heartbeat.on_enabled
+local _hb_enabled_prev = Heartbeat.on_enabled
 local _hb_disabled_prev = Heartbeat.on_disabled
 
 Heartbeat.on_enabled = function(...)
-    if _hb_enabled_prev then pcall(_hb_enabled_prev, ...) end
+    if _hb_enabled_prev then
+        pcall(_hb_enabled_prev, ...)
+    end
     PlayerCtx._disabled = false
 end
 
 Heartbeat.on_disabled = function(...)
-    if _hb_disabled_prev then pcall(_hb_disabled_prev, ...) end
+    if _hb_disabled_prev then
+        pcall(_hb_disabled_prev, ...)
+    end
     if not PlayerCtx._disabled then
         PlayerCtx._disabled = true
         _drop_caches()
@@ -103,7 +114,9 @@ function PlayerCtx.on_disable(fn)
 end
 
 function PlayerCtx.force_disable(reason)
-    if reason then log_warn("force_disable: " .. tostring(reason), "force_disable") end
+    if reason then
+        log_warn("force_disable: " .. tostring(reason), "force_disable")
+    end
     if not PlayerCtx._disabled then
         PlayerCtx._disabled = true
         _drop_caches()
@@ -119,16 +132,22 @@ end
 
 function PlayerCtx.clear_caches()
     _drop_caches()
-    _lockon_fn    = nil
+    _lockon_fn = nil
     _lockon_tried = false
-    _lockon_pawn  = nil
+    _lockon_pawn = nil
 end
 
 function PlayerCtx.get_pc()
-    if PlayerCtx.is_disabled() then return nil end
-    if obj_is_valid(PlayerCtx._pc) then return PlayerCtx._pc end
+    if PlayerCtx.is_disabled() then
+        return nil
+    end
+    if obj_is_valid(PlayerCtx._pc) then
+        return PlayerCtx._pc
+    end
 
-    local ok, pc = pcall(function() return FindFirstOf("SBPlayerController") end)
+    local ok, pc = pcall(function()
+        return FindFirstOf("SBPlayerController")
+    end)
     if not ok or not obj_is_valid(pc) then
         log_debug("get_pc: SBPlayerController not ready yet", "pc_missing", true)
         return nil
@@ -138,7 +157,9 @@ function PlayerCtx.get_pc()
 end
 
 function PlayerCtx.get_pawn()
-    if PlayerCtx.is_disabled() then return nil end
+    if PlayerCtx.is_disabled() then
+        return nil
+    end
 
     local pc = PlayerCtx.get_pc()
     if not pc or not obj_is_valid(pc) then
@@ -149,11 +170,14 @@ function PlayerCtx.get_pawn()
     end
 
     -- 1. Query the engine's absolute truth FIRST, safely.
-    local ok_engine, engine_pawn = pcall(function() return pc.Pawn end)
+    local ok_engine, engine_pawn = pcall(function()
+        return pc.Pawn
+    end)
     if not ok_engine or not engine_pawn then
         if not ok_engine then
             log_warn(
-                "get_pawn: failed to read pc.Pawn; clearing pawn caches. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
+                "get_pawn: failed to read pc.Pawn; clearing pawn caches. hb_disabled="
+                    .. tostring(Heartbeat.is_disabled()),
                 "pawn_read_failed",
                 true
             )
@@ -185,8 +209,12 @@ function PlayerCtx.get_pawn()
 end
 
 function PlayerCtx.get_camera()
-    if PlayerCtx.is_disabled() then return nil end
-    if obj_is_valid(PlayerCtx._cam) then return PlayerCtx._cam end
+    if PlayerCtx.is_disabled() then
+        return nil
+    end
+    if obj_is_valid(PlayerCtx._cam) then
+        return PlayerCtx._cam
+    end
 
     local pawn = PlayerCtx.get_pawn()
     if not pawn then
@@ -194,7 +222,9 @@ function PlayerCtx.get_camera()
         return nil
     end
 
-    local ok, cam = pcall(function() return pawn.FollowCamera end)
+    local ok, cam = pcall(function()
+        return pawn.FollowCamera
+    end)
     if not ok or not obj_is_valid(cam) then
         log_debug("get_camera: FollowCamera not ready yet", "cam_missing", true)
         return nil
@@ -204,8 +234,12 @@ function PlayerCtx.get_camera()
 end
 
 function PlayerCtx.get_camera_boom()
-    if PlayerCtx.is_disabled() then return nil end
-    if obj_is_valid(PlayerCtx._boom) then return PlayerCtx._boom end
+    if PlayerCtx.is_disabled() then
+        return nil
+    end
+    if obj_is_valid(PlayerCtx._boom) then
+        return PlayerCtx._boom
+    end
 
     local pawn = PlayerCtx.get_pawn()
     if not pawn then
@@ -213,7 +247,9 @@ function PlayerCtx.get_camera_boom()
         return nil
     end
 
-    local ok, boom = pcall(function() return pawn.CameraBoom end)
+    local ok, boom = pcall(function()
+        return pawn.CameraBoom
+    end)
     if not ok or not obj_is_valid(boom) then
         log_debug("get_camera_boom: CameraBoom not ready yet", "boom_missing", true)
         return nil
@@ -223,11 +259,19 @@ function PlayerCtx.get_camera_boom()
 end
 
 function PlayerCtx.is_tps_mode()
-    if Heartbeat.is_disabled() then return nil end
+    if Heartbeat.is_disabled() then
+        return nil
+    end
     local pawn = PlayerCtx.get_pawn()
-    if not obj_is_valid(pawn) then return nil end
-    local ok, result = pcall(function() return pawn:IsTPSMode() end)
-    if ok then return result end
+    if not obj_is_valid(pawn) then
+        return nil
+    end
+    local ok, result = pcall(function()
+        return pawn:IsTPSMode()
+    end)
+    if ok then
+        return result
+    end
     log_warn(
         "is_tps_mode: engine call failed while reading TPS state. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
         "tps_mode_read_failed",
@@ -237,11 +281,19 @@ function PlayerCtx.is_tps_mode()
 end
 
 function PlayerCtx.is_battle()
-    if Heartbeat.is_disabled() then return nil end
+    if Heartbeat.is_disabled() then
+        return nil
+    end
     local pawn = PlayerCtx.get_pawn()
-    if not obj_is_valid(pawn) then return nil end
-    local ok, result = pcall(function() return pawn:IsBattle() end)
-    if ok then return result end
+    if not obj_is_valid(pawn) then
+        return nil
+    end
+    local ok, result = pcall(function()
+        return pawn:IsBattle()
+    end)
+    if ok then
+        return result
+    end
     log_warn(
         "is_battle: engine call failed while reading battle state. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
         "battle_state_read_failed",
@@ -251,7 +303,9 @@ function PlayerCtx.is_battle()
 end
 
 function PlayerCtx.is_lock_on()
-    if Heartbeat.is_disabled() then return nil end
+    if Heartbeat.is_disabled() then
+        return nil
+    end
     local pawn = PlayerCtx.get_pawn()
     if not obj_is_valid(pawn) then
         clear_lockon_caches()
@@ -259,37 +313,61 @@ function PlayerCtx.is_lock_on()
     end
 
     if _lockon_pawn ~= pawn then
-        _lockon_fn    = nil
+        _lockon_fn = nil
         _lockon_tried = false
-        _lockon_pawn  = pawn
+        _lockon_pawn = pawn
     end
 
     if _lockon_fn then
         local ok, result = pcall(_lockon_fn, pawn)
-        if ok then return result end
+        if ok then
+            return result
+        end
         log_warn(
-            "is_lock_on: cached lock-on probe failed; retrying method discovery. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
+            "is_lock_on: cached lock-on probe failed; retrying method discovery. hb_disabled="
+                .. tostring(Heartbeat.is_disabled()),
             "lockon_probe_failed",
             true
         )
-        _lockon_fn    = nil
+        _lockon_fn = nil
         _lockon_tried = false
     end
 
-    if _lockon_tried then return nil end
+    if _lockon_tried then
+        return nil
+    end
     _lockon_tried = true
 
-    local ok_bl, val_bl = pcall(function() return pawn.bLockOn end)
+    local ok_bl, val_bl = pcall(function()
+        return pawn.bLockOn
+    end)
     if ok_bl and type(val_bl) == "boolean" then
-        _lockon_fn = function(p) return p.bLockOn end
+        _lockon_fn = function(p)
+            return p.bLockOn
+        end
         log_debug("Lock-on detection: using bLockOn property", "lockon_detect_bLockOn", true)
         return val_bl
     end
 
     local candidates = {
-        { name = "IsLockOn",       fn = function(p) return p:IsLockOn() end },
-        { name = "IsLockOnMode",   fn = function(p) return p:IsLockOnMode() end },
-        { name = "IsTargetLockOn", fn = function(p) return p:IsTargetLockOn() end },
+        {
+            name = "IsLockOn",
+            fn = function(p)
+                return p:IsLockOn()
+            end,
+        },
+        {
+            name = "IsLockOnMode",
+            fn = function(p)
+                return p:IsLockOnMode()
+            end,
+        },
+        {
+            name = "IsTargetLockOn",
+            fn = function(p)
+                return p:IsTargetLockOn()
+            end,
+        },
     }
     for _, m in ipairs(candidates) do
         local ok, result = pcall(m.fn, pawn)
@@ -300,45 +378,67 @@ function PlayerCtx.is_lock_on()
         end
     end
 
-    local ok_lc, _ = pcall(function() return pawn.LockOnCharacter end)
+    local ok_lc, _ = pcall(function()
+        return pawn.LockOnCharacter
+    end)
     if ok_lc then
         _lockon_fn = function(p)
             local t = p.LockOnCharacter
-            if t == nil then return false end
-            if t.IsValid then return t:IsValid() end
+            if t == nil then
+                return false
+            end
+            if t.IsValid then
+                return t:IsValid()
+            end
             return true
         end
         log_debug("Lock-on detection: using LockOnCharacter property", "lockon_detect_LockOnCharacter")
         return _lockon_fn(pawn)
     end
 
-    _lockon_fn    = nil
+    _lockon_fn = nil
     _lockon_tried = false
     log_warn("No lock-on detection method found!", "lockon_detect_none")
     return nil
 end
 
 function PlayerCtx.camera_or_pc_invalid()
-    if PlayerCtx.is_disabled() then return true end
-    if not PlayerCtx.get_pc()     then return true end
-    if not PlayerCtx.get_camera() then return true end
+    if PlayerCtx.is_disabled() then
+        return true
+    end
+    if not PlayerCtx.get_pc() then
+        return true
+    end
+    if not PlayerCtx.get_camera() then
+        return true
+    end
     return false
 end
 
 function PlayerCtx.ensure_ready(require_boom)
-    if PlayerCtx.is_disabled()    then return false end
-    if not PlayerCtx.get_pc()     then return false end
-    if not PlayerCtx.get_pawn()   then return false end
-    if not PlayerCtx.get_camera() then return false end
-    if require_boom and not PlayerCtx.get_camera_boom() then return false end
+    if PlayerCtx.is_disabled() then
+        return false
+    end
+    if not PlayerCtx.get_pc() then
+        return false
+    end
+    if not PlayerCtx.get_pawn() then
+        return false
+    end
+    if not PlayerCtx.get_camera() then
+        return false
+    end
+    if require_boom and not PlayerCtx.get_camera_boom() then
+        return false
+    end
     return true
 end
 
 local _loco = {
-    last_state    = nil,
+    last_state = nil,
     pending_state = nil,
-    change_t      = 0,
-    stable_delay  = 0.3,
+    change_t = 0,
+    stable_delay = 0.3,
 }
 
 function PlayerCtx.get_locomotion_state()
@@ -347,11 +447,14 @@ function PlayerCtx.get_locomotion_state()
         return _loco.last_state
     end
 
-    local ok_cm, cm = pcall(function() return pawn.CharacterMovement end)
+    local ok_cm, cm = pcall(function()
+        return pawn.CharacterMovement
+    end)
     if not ok_cm or not cm or (not obj_is_valid(cm)) then
         if not ok_cm then
             log_warn(
-                "get_locomotion_state: failed to read CharacterMovement. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
+                "get_locomotion_state: failed to read CharacterMovement. hb_disabled="
+                    .. tostring(Heartbeat.is_disabled()),
                 "loco_character_movement_read_failed",
                 true
             )
@@ -359,11 +462,14 @@ function PlayerCtx.get_locomotion_state()
         return _loco.last_state
     end
 
-    local ok_v, v = pcall(function() return cm.Velocity end)
+    local ok_v, v = pcall(function()
+        return cm.Velocity
+    end)
     if not ok_v or not v then
         if not ok_v then
             log_warn(
-                "get_locomotion_state: failed to read movement velocity. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
+                "get_locomotion_state: failed to read movement velocity. hb_disabled="
+                    .. tostring(Heartbeat.is_disabled()),
                 "loco_velocity_read_failed",
                 true
             )
@@ -392,7 +498,7 @@ function PlayerCtx.get_locomotion_state()
             _loco.pending_state = new_state
             _loco.change_t = now
         elseif (now - _loco.change_t) >= _loco.stable_delay then
-            _loco.last_state    = new_state
+            _loco.last_state = new_state
             _loco.pending_state = nil
         end
     else
@@ -403,14 +509,20 @@ function PlayerCtx.get_locomotion_state()
 end
 
 function PlayerCtx.get_snapshot()
-    if Heartbeat.is_disabled() then return nil end
-    if PlayerCtx._disabled      then return nil end
+    if Heartbeat.is_disabled() then
+        return nil
+    end
+    if PlayerCtx._disabled then
+        return nil
+    end
 
-    if not PlayerCtx.ensure_ready(false) then return nil end
+    if not PlayerCtx.ensure_ready(false) then
+        return nil
+    end
 
-    local pc   = PlayerCtx._pc
+    local pc = PlayerCtx._pc
     local pawn = PlayerCtx._pawn
-    local cam  = PlayerCtx._cam
+    local cam = PlayerCtx._cam
     local boom = PlayerCtx._boom
 
     if not (obj_is_valid(pc) and obj_is_valid(pawn) and obj_is_valid(cam)) then

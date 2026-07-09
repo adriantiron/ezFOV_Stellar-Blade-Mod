@@ -1,10 +1,10 @@
-local Config    = require("config")
-local Camera    = require("camera")
-local Env       = require("env").bind("Main")
+local Config = require("config")
+local Camera = require("camera")
+local Env = require("env").bind("Main")
 local PlayerCtx = require("playercontext")
-local Hooks     = require("hooks")
-local Stance    = require("stance")
-local Logging   = require("logging")
+local Hooks = require("hooks")
+local Stance = require("stance")
+local Logging = require("logging")
 
 -- Local helper logging functions to prefix messages with the module name and enforce level
 local function log_error(message, once_key)
@@ -31,48 +31,52 @@ if not cfg then
     return
 end
 
-log_debug(string.format(
-    "Initial config: FOV(default=%.0f,fov=%.0f,combat=%.0f,tps=%.0f,idle=%.0f,walk=%.0f,sprint=%.0f,lockon=%.0f) " ..
-    "Pos(default=(%.0f,%.0f,%.0f),combat=(%.0f,%.0f,%.0f),lockon=(%.0f,%.0f,%.0f),idle=(%.0f,%.0f,%.0f),walk=(%.0f,%.0f,%.0f),sprint=(%.0f,%.0f,%.0f)) " ..
-    "flags(lockon=%s,idle=%s,walk=%s,sprint=%s,collision=%s) " ..
-    "bias(yaw=%.1f,pitch=%.1f) exit_blend=%.3f steps(fov=%d,key=%d)",
-    cfg.fovs.default or 0,
-    cfg.fovs.fov or 0,
-    cfg.fovs.combat or 0,
-    cfg.fovs.tps or 0,
-    cfg.fovs.idle or 0,
-    cfg.fovs.walk or 0,
-    cfg.fovs.sprint or 0,
-    cfg.fovs.lockon or 0,
-    cfg.DefaultPosition.x or 0,
-    cfg.DefaultPosition.y or 0,
-    cfg.DefaultPosition.z or 0,
-    cfg.CombatPosition.x or 0,
-    cfg.CombatPosition.y or 0,
-    cfg.CombatPosition.z or 0,
-    cfg.LockOnPosition.x or 0,
-    cfg.LockOnPosition.y or 0,
-    cfg.LockOnPosition.z or 0,
-    cfg.IdlePosition.x or 0,
-    cfg.IdlePosition.y or 0,
-    cfg.IdlePosition.z or 0,
-    cfg.WalkPosition.x or 0,
-    cfg.WalkPosition.y or 0,
-    cfg.WalkPosition.z or 0,
-    cfg.SprintPosition.x or 0,
-    cfg.SprintPosition.y or 0,
-    cfg.SprintPosition.z or 0,
-    tostring(cfg.EnableLockOnCamera),
-    tostring(cfg.EnableIdleCamera),
-    tostring(cfg.EnableWalkingCamera),
-    tostring(cfg.EnableSprintingCamera),
-    tostring(cfg.DisableCameraCollision),
-    cfg.LockOnYawBias or 0,
-    cfg.LockOnPitchBias or 0,
-    cfg.LockOnExitBlendTime or 0,
-    cfg.FOVTransitionSteps or 0,
-    cfg.KeyFOVTransitionSteps or 0
-), "config_initial_state", true)
+log_debug(
+    string.format(
+        "Initial config: FOV(default=%.0f,fov=%.0f,combat=%.0f,tps=%.0f,idle=%.0f,walk=%.0f,sprint=%.0f,lockon=%.0f) "
+            .. "Pos(default=(%.0f,%.0f,%.0f),combat=(%.0f,%.0f,%.0f),lockon=(%.0f,%.0f,%.0f),idle=(%.0f,%.0f,%.0f),walk=(%.0f,%.0f,%.0f),sprint=(%.0f,%.0f,%.0f)) "
+            .. "flags(lockon=%s,idle=%s,walk=%s,sprint=%s,collision=%s) "
+            .. "bias(yaw=%.1f,pitch=%.1f) exit_blend=%.3f steps(fov=%d,key=%d)",
+        cfg.fovs.default or 0,
+        cfg.fovs.fov or 0,
+        cfg.fovs.combat or 0,
+        cfg.fovs.tps or 0,
+        cfg.fovs.idle or 0,
+        cfg.fovs.walk or 0,
+        cfg.fovs.sprint or 0,
+        cfg.fovs.lockon or 0,
+        cfg.DefaultPosition.x or 0,
+        cfg.DefaultPosition.y or 0,
+        cfg.DefaultPosition.z or 0,
+        cfg.CombatPosition.x or 0,
+        cfg.CombatPosition.y or 0,
+        cfg.CombatPosition.z or 0,
+        cfg.LockOnPosition.x or 0,
+        cfg.LockOnPosition.y or 0,
+        cfg.LockOnPosition.z or 0,
+        cfg.IdlePosition.x or 0,
+        cfg.IdlePosition.y or 0,
+        cfg.IdlePosition.z or 0,
+        cfg.WalkPosition.x or 0,
+        cfg.WalkPosition.y or 0,
+        cfg.WalkPosition.z or 0,
+        cfg.SprintPosition.x or 0,
+        cfg.SprintPosition.y or 0,
+        cfg.SprintPosition.z or 0,
+        tostring(cfg.EnableLockOnCamera),
+        tostring(cfg.EnableIdleCamera),
+        tostring(cfg.EnableWalkingCamera),
+        tostring(cfg.EnableSprintingCamera),
+        tostring(cfg.DisableCameraCollision),
+        cfg.LockOnYawBias or 0,
+        cfg.LockOnPitchBias or 0,
+        cfg.LockOnExitBlendTime or 0,
+        cfg.FOVTransitionSteps or 0,
+        cfg.KeyFOVTransitionSteps or 0
+    ),
+    "config_initial_state",
+    true
+)
 
 local ok_init, init_err = pcall(function()
     Camera.init(cfg)
@@ -106,20 +110,23 @@ Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
     end
 
     cfg = reloaded_cfg
-    if Stance.reset_state then Stance.reset_state() end
-    if Hooks.defer_stance_pulse then Hooks.defer_stance_pulse(220, "f8_reload") end
+    if Stance.reset_state then
+        Stance.reset_state()
+    end
+    if Hooks.defer_stance_pulse then
+        Hooks.defer_stance_pulse(220, "f8_reload")
+    end
     Camera.init(cfg) -- Keep camera's internal reference perfectly synchronized
 
     Env.run_on_game_thread("reload_config_apply", function()
-        local isTPS    = (PlayerCtx.is_tps_mode() == true)
-        local isLockOn = (PlayerCtx.is_lock_on()  == true)
-        local isBattle = (PlayerCtx.is_battle()    == true)
+        local isTPS = (PlayerCtx.is_tps_mode() == true)
+        local isLockOn = (PlayerCtx.is_lock_on() == true)
+        local isBattle = (PlayerCtx.is_battle() == true)
 
         -- Fetch the live locomotion state
         local locoState = PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state()
 
-        local fov =
-            (isTPS    and (cfg.fovs.tps or cfg.fovs.fov))
+        local fov = (isTPS and (cfg.fovs.tps or cfg.fovs.fov))
             or (isLockOn and cfg.EnableLockOnCamera and (cfg.fovs.lockon or cfg.fovs.combat))
             or (isBattle and cfg.fovs.combat)
             or (locoState == PlayerCtx.LOCO_STATES.idle and cfg.EnableIdleCamera and cfg.fovs.idle)
@@ -127,8 +134,7 @@ Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
             or (locoState == PlayerCtx.LOCO_STATES.sprint and cfg.EnableSprintingCamera and cfg.fovs.sprint)
             or cfg.fovs.fov
 
-        local pos =
-            (isLockOn and cfg.EnableLockOnCamera and cfg.LockOnPosition)
+        local pos = (isLockOn and cfg.EnableLockOnCamera and cfg.LockOnPosition)
             or (isBattle and cfg.CombatPosition)
             or (locoState == PlayerCtx.LOCO_STATES.idle and cfg.EnableIdleCamera and cfg.IdlePosition)
             or (locoState == PlayerCtx.LOCO_STATES.slow_walk and cfg.EnableWalkingCamera and cfg.WalkPosition)
@@ -142,12 +148,16 @@ Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
             if should_blend_lockon_exit and Camera.begin_lockon_exit_blend then
                 local started = Camera.begin_lockon_exit_blend(pos, fov, nil, cfg.LockOnExitBlendTime)
                 if not started then
-                    if Camera.cancel_lockon_exit_blend then Camera.cancel_lockon_exit_blend() end
+                    if Camera.cancel_lockon_exit_blend then
+                        Camera.cancel_lockon_exit_blend()
+                    end
                     Camera.set_fov_via_function(fov)
                     Camera.set_camera_relative_location(pos)
                 end
             else
-                if Camera.cancel_lockon_exit_blend then Camera.cancel_lockon_exit_blend() end
+                if Camera.cancel_lockon_exit_blend then
+                    Camera.cancel_lockon_exit_blend()
+                end
                 Camera.set_fov_via_function(fov)
                 Camera.set_camera_relative_location(pos)
             end
@@ -155,9 +165,21 @@ Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
 
         Camera.disable_camera_collision(cfg.DisableCameraCollision)
 
-        log_debug(string.format("Reloaded. TPS=%s Lock=%s Battle=%s FOV=%.0f Pos=(%.0f,%.0f,%.0f) YawBias=%.1f PitchBias=%.1f",
-            tostring(isTPS), tostring(isLockOn), tostring(isBattle),
-            fov, pos.x, pos.y, pos.z, cfg.LockOnYawBias or 0, cfg.LockOnPitchBias or 0), "reload_config")
+        log_debug(
+            string.format(
+                "Reloaded. TPS=%s Lock=%s Battle=%s FOV=%.0f Pos=(%.0f,%.0f,%.0f) YawBias=%.1f PitchBias=%.1f",
+                tostring(isTPS),
+                tostring(isLockOn),
+                tostring(isBattle),
+                fov,
+                pos.x,
+                pos.y,
+                pos.z,
+                cfg.LockOnYawBias or 0,
+                cfg.LockOnPitchBias or 0
+            ),
+            "reload_config"
+        )
     end)
 end)
 
@@ -165,15 +187,23 @@ end)
 
 local function ensure_lockon_enforcement(cfg)
     if not Camera or not Camera.start_enforcement then
-        log_error("Unable to restart lock-on enforcement because the camera module is unavailable.", "enforcement_restart_missing_camera")
+        log_error(
+            "Unable to restart lock-on enforcement because the camera module is unavailable.",
+            "enforcement_restart_missing_camera"
+        )
         return
     end
     if not cfg or type(cfg) ~= "table" or not cfg.fovs then
-        log_error("Unable to restart lock-on enforcement because the runtime config is invalid.", "enforcement_restart_missing_cfg")
+        log_error(
+            "Unable to restart lock-on enforcement because the runtime config is invalid.",
+            "enforcement_restart_missing_cfg"
+        )
         return
     end
 
-    if Camera.is_enforcing() then return end
+    if Camera.is_enforcing() then
+        return
+    end
     local fov = cfg.fovs.lockon or cfg.fovs.combat or cfg.fovs.fov
     Camera.start_enforcement(cfg.LockOnPosition, fov)
     log_debug("Restarted dead enforcement loop", "restart_enforcement")
@@ -188,30 +218,48 @@ local function adjust_current_fov(delta)
 
     local profile = Stance.get_current_profile()
 
-    if     profile == Stance.PROFILES.tps    then cfg.fovs.tps    = (cfg.fovs.tps    or cfg.fovs.fov) + delta
-    elseif profile == Stance.PROFILES.lockon then cfg.fovs.lockon = (cfg.fovs.lockon or cfg.fovs.combat or cfg.fovs.fov) + delta
-    elseif profile == Stance.PROFILES.battle then cfg.fovs.combat = (cfg.fovs.combat or cfg.fovs.fov) + delta -- Defensive fallback added
-    elseif profile == Stance.PROFILES.idle    then cfg.fovs.idle   = (cfg.fovs.idle   or cfg.fovs.fov) + delta
-    elseif profile == Stance.PROFILES.walk    then cfg.fovs.walk   = (cfg.fovs.walk   or cfg.fovs.fov) + delta
-    elseif profile == Stance.PROFILES.sprint  then cfg.fovs.sprint = (cfg.fovs.sprint or cfg.fovs.fov) + delta
-    else                            cfg.fovs.fov    = cfg.fovs.fov + delta
+    if profile == Stance.PROFILES.tps then
+        cfg.fovs.tps = (cfg.fovs.tps or cfg.fovs.fov) + delta
+    elseif profile == Stance.PROFILES.lockon then
+        cfg.fovs.lockon = (cfg.fovs.lockon or cfg.fovs.combat or cfg.fovs.fov) + delta
+    elseif profile == Stance.PROFILES.battle then
+        cfg.fovs.combat = (cfg.fovs.combat or cfg.fovs.fov) + delta -- Defensive fallback added
+    elseif profile == Stance.PROFILES.idle then
+        cfg.fovs.idle = (cfg.fovs.idle or cfg.fovs.fov) + delta
+    elseif profile == Stance.PROFILES.walk then
+        cfg.fovs.walk = (cfg.fovs.walk or cfg.fovs.fov) + delta
+    elseif profile == Stance.PROFILES.sprint then
+        cfg.fovs.sprint = (cfg.fovs.sprint or cfg.fovs.fov) + delta
+    else
+        cfg.fovs.fov = cfg.fovs.fov + delta
     end
 
     for k, v in pairs(cfg.fovs) do
         if type(v) == "number" then
-            if v < 30  then cfg.fovs[k] = 30  end
-            if v > 120 then cfg.fovs[k] = 120 end
+            if v < 30 then
+                cfg.fovs[k] = 30
+            end
+            if v > 120 then
+                cfg.fovs[k] = 120
+            end
         end
     end
 
     local new_fov
-    if     profile == Stance.PROFILES.tps    then new_fov = cfg.fovs.tps
-    elseif profile == Stance.PROFILES.lockon then new_fov = cfg.fovs.lockon
-    elseif profile == Stance.PROFILES.battle then new_fov = cfg.fovs.combat
-    elseif profile == Stance.PROFILES.idle   then new_fov = cfg.fovs.idle
-    elseif profile == Stance.PROFILES.walk   then new_fov = cfg.fovs.walk
-    elseif profile == Stance.PROFILES.sprint then new_fov = cfg.fovs.sprint
-    else                            new_fov = cfg.fovs.fov
+    if profile == Stance.PROFILES.tps then
+        new_fov = cfg.fovs.tps
+    elseif profile == Stance.PROFILES.lockon then
+        new_fov = cfg.fovs.lockon
+    elseif profile == Stance.PROFILES.battle then
+        new_fov = cfg.fovs.combat
+    elseif profile == Stance.PROFILES.idle then
+        new_fov = cfg.fovs.idle
+    elseif profile == Stance.PROFILES.walk then
+        new_fov = cfg.fovs.walk
+    elseif profile == Stance.PROFILES.sprint then
+        new_fov = cfg.fovs.sprint
+    else
+        new_fov = cfg.fovs.fov
     end
 
     if profile == Stance.PROFILES.lockon then
@@ -237,12 +285,18 @@ local function adjust_current_position(axis, delta)
     local profile = Stance.get_current_profile()
 
     local pos
-    if     profile == Stance.PROFILES.lockon then pos = cfg.LockOnPosition
-    elseif profile == Stance.PROFILES.battle then pos = cfg.CombatPosition
-    elseif profile == Stance.PROFILES.idle   then pos = cfg.IdlePosition
-    elseif profile == Stance.PROFILES.walk   then pos = cfg.WalkPosition
-    elseif profile == Stance.PROFILES.sprint then pos = cfg.SprintPosition
-    else                            pos = cfg.DefaultPosition
+    if profile == Stance.PROFILES.lockon then
+        pos = cfg.LockOnPosition
+    elseif profile == Stance.PROFILES.battle then
+        pos = cfg.CombatPosition
+    elseif profile == Stance.PROFILES.idle then
+        pos = cfg.IdlePosition
+    elseif profile == Stance.PROFILES.walk then
+        pos = cfg.WalkPosition
+    elseif profile == Stance.PROFILES.sprint then
+        pos = cfg.SprintPosition
+    else
+        pos = cfg.DefaultPosition
     end
 
     pos[axis] = (pos[axis] or 0) + delta
@@ -270,8 +324,12 @@ local function adjust_lockon_bias(field, delta)
     cfg[field] = (cfg[field] or 0) + delta
 
     -- Clamp to reasonable range
-    if cfg[field] > 30  then cfg[field] = 30  end
-    if cfg[field] < -30 then cfg[field] = -30 end
+    if cfg[field] > 30 then
+        cfg[field] = 30
+    end
+    if cfg[field] < -30 then
+        cfg[field] = -30
+    end
 
     if Camera.is_enforcing() then
         if field == "LockOnYawBias" then
@@ -292,10 +350,10 @@ local function apply_for_current_state()
         return
     end
 
-    local isTPS    = (PlayerCtx.is_tps_mode() == true)
-    local isLockOn = (PlayerCtx.is_lock_on()  == true)
-    local isBattle = (PlayerCtx.is_battle()    == true)
-    local loco     = PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state()
+    local isTPS = (PlayerCtx.is_tps_mode() == true)
+    local isLockOn = (PlayerCtx.is_lock_on() == true)
+    local isBattle = (PlayerCtx.is_battle() == true)
+    local loco = PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state()
 
     local fov = cfg.fovs.fov
     local pos = cfg.DefaultPosition
@@ -326,12 +384,16 @@ local function apply_for_current_state()
         if should_blend_lockon_exit and Camera.begin_lockon_exit_blend then
             local started = Camera.begin_lockon_exit_blend(pos, fov, nil, cfg.LockOnExitBlendTime)
             if not started then
-                if Camera.cancel_lockon_exit_blend then Camera.cancel_lockon_exit_blend() end
+                if Camera.cancel_lockon_exit_blend then
+                    Camera.cancel_lockon_exit_blend()
+                end
                 Camera.set_fov_via_function(fov, cfg.KeyFOVTransitionSteps)
                 Camera.set_camera_relative_location(pos, cfg.KeyFOVTransitionSteps)
             end
         else
-            if Camera.cancel_lockon_exit_blend then Camera.cancel_lockon_exit_blend() end
+            if Camera.cancel_lockon_exit_blend then
+                Camera.cancel_lockon_exit_blend()
+            end
             Camera.set_fov_via_function(fov, cfg.KeyFOVTransitionSteps)
             Camera.set_camera_relative_location(pos, cfg.KeyFOVTransitionSteps)
         end
@@ -341,44 +403,78 @@ end
 
 -- ==================== Keybinds: FOV ====================
 
-Env.register_safe_keybind(Env.Key.F5, {}, "adjust_fov_f5", function() adjust_current_fov(-25) end)
-Env.register_safe_keybind(Env.Key.F6, {}, "adjust_fov_f6", function() adjust_current_fov(-5)  end)
-Env.register_safe_keybind(Env.Key.F7, {}, "adjust_fov_f7", function() adjust_current_fov(5)   end)
+Env.register_safe_keybind(Env.Key.F5, {}, "adjust_fov_f5", function()
+    adjust_current_fov(-25)
+end)
+Env.register_safe_keybind(Env.Key.F6, {}, "adjust_fov_f6", function()
+    adjust_current_fov(-5)
+end)
+Env.register_safe_keybind(Env.Key.F7, {}, "adjust_fov_f7", function()
+    adjust_current_fov(5)
+end)
 
 -- ==================== Keybinds: Position ====================
 
-Env.register_safe_keybind(Env.Key.UP_ARROW,    {Env.ModifierKey.CONTROL}, "adjust_position_ctrl_up", function() adjust_current_position("x",  50) end)
-Env.register_safe_keybind(Env.Key.DOWN_ARROW,  {Env.ModifierKey.CONTROL}, "adjust_position_ctrl_down", function() adjust_current_position("x", -50) end)
-Env.register_safe_keybind(Env.Key.UP_ARROW,    {Env.ModifierKey.ALT},     "adjust_position_alt_up", function() adjust_current_position("z",  10) end)
-Env.register_safe_keybind(Env.Key.DOWN_ARROW,  {Env.ModifierKey.ALT},     "adjust_position_alt_down", function() adjust_current_position("z", -10) end)
-Env.register_safe_keybind(Env.Key.LEFT_ARROW,  {Env.ModifierKey.ALT},     "adjust_position_alt_left", function() adjust_current_position("y", -10) end)
-Env.register_safe_keybind(Env.Key.RIGHT_ARROW, {Env.ModifierKey.ALT},     "adjust_position_alt_right", function() adjust_current_position("y",  10) end)
+Env.register_safe_keybind(Env.Key.UP_ARROW, { Env.ModifierKey.CONTROL }, "adjust_position_ctrl_up", function()
+    adjust_current_position("x", 50)
+end)
+Env.register_safe_keybind(Env.Key.DOWN_ARROW, { Env.ModifierKey.CONTROL }, "adjust_position_ctrl_down", function()
+    adjust_current_position("x", -50)
+end)
+Env.register_safe_keybind(Env.Key.UP_ARROW, { Env.ModifierKey.ALT }, "adjust_position_alt_up", function()
+    adjust_current_position("z", 10)
+end)
+Env.register_safe_keybind(Env.Key.DOWN_ARROW, { Env.ModifierKey.ALT }, "adjust_position_alt_down", function()
+    adjust_current_position("z", -10)
+end)
+Env.register_safe_keybind(Env.Key.LEFT_ARROW, { Env.ModifierKey.ALT }, "adjust_position_alt_left", function()
+    adjust_current_position("y", -10)
+end)
+Env.register_safe_keybind(Env.Key.RIGHT_ARROW, { Env.ModifierKey.ALT }, "adjust_position_alt_right", function()
+    adjust_current_position("y", 10)
+end)
 
 -- ==================== Keybinds: Lock-on biases ====================
 -- SHIFT + UP/DOWN    = PitchBias (target up/down on screen)
 -- SHIFT + LEFT/RIGHT = YawBias   (target left/right on screen)
 
-Env.register_safe_keybind(Env.Key.UP_ARROW,    {Env.ModifierKey.SHIFT}, "adjust_bias_shift_up", function() adjust_lockon_bias("LockOnPitchBias",  1) end)
-Env.register_safe_keybind(Env.Key.DOWN_ARROW,  {Env.ModifierKey.SHIFT}, "adjust_bias_shift_down", function() adjust_lockon_bias("LockOnPitchBias", -1) end)
-Env.register_safe_keybind(Env.Key.RIGHT_ARROW, {Env.ModifierKey.SHIFT}, "adjust_bias_shift_right", function() adjust_lockon_bias("LockOnYawBias",    1) end)
-Env.register_safe_keybind(Env.Key.LEFT_ARROW,  {Env.ModifierKey.SHIFT}, "adjust_bias_shift_left", function() adjust_lockon_bias("LockOnYawBias",   -1) end)
+Env.register_safe_keybind(Env.Key.UP_ARROW, { Env.ModifierKey.SHIFT }, "adjust_bias_shift_up", function()
+    adjust_lockon_bias("LockOnPitchBias", 1)
+end)
+Env.register_safe_keybind(Env.Key.DOWN_ARROW, { Env.ModifierKey.SHIFT }, "adjust_bias_shift_down", function()
+    adjust_lockon_bias("LockOnPitchBias", -1)
+end)
+Env.register_safe_keybind(Env.Key.RIGHT_ARROW, { Env.ModifierKey.SHIFT }, "adjust_bias_shift_right", function()
+    adjust_lockon_bias("LockOnYawBias", 1)
+end)
+Env.register_safe_keybind(Env.Key.LEFT_ARROW, { Env.ModifierKey.SHIFT }, "adjust_bias_shift_left", function()
+    adjust_lockon_bias("LockOnYawBias", -1)
+end)
 
 -- ==================== Keybinds: Presets ====================
 
-Env.register_safe_keybind(Env.Key.ONE,   {Env.ModifierKey.ALT}, "save_preset_1", function() Config.save_preset(1) end)
-Env.register_safe_keybind(Env.Key.TWO,   {Env.ModifierKey.ALT}, "save_preset_2", function() Config.save_preset(2) end)
-Env.register_safe_keybind(Env.Key.THREE, {Env.ModifierKey.ALT}, "save_preset_3", function() Config.save_preset(3) end)
-Env.register_safe_keybind(Env.Key.FOUR,  {Env.ModifierKey.ALT}, "save_preset_4", function() Config.save_preset(4) end)
+Env.register_safe_keybind(Env.Key.ONE, { Env.ModifierKey.ALT }, "save_preset_1", function()
+    Config.save_preset(1)
+end)
+Env.register_safe_keybind(Env.Key.TWO, { Env.ModifierKey.ALT }, "save_preset_2", function()
+    Config.save_preset(2)
+end)
+Env.register_safe_keybind(Env.Key.THREE, { Env.ModifierKey.ALT }, "save_preset_3", function()
+    Config.save_preset(3)
+end)
+Env.register_safe_keybind(Env.Key.FOUR, { Env.ModifierKey.ALT }, "save_preset_4", function()
+    Config.save_preset(4)
+end)
 
 -- ==================== Keybinds: Presets Loading loop ====================
 -- ALT  + 1-4 = Saves current configurations to preset files (Handled above)
 -- CTRL + 1-4 = Loads and dynamically applies preset profiles (Handled here)
 
-local preset_keys = {Env.Key.ONE, Env.Key.TWO, Env.Key.THREE, Env.Key.FOUR}
+local preset_keys = { Env.Key.ONE, Env.Key.TWO, Env.Key.THREE, Env.Key.FOUR }
 for i = 1, 4 do
     local key = preset_keys[i]
     local num = i
-    Env.register_safe_keybind(key, {Env.ModifierKey.CONTROL}, "load_preset_" .. tostring(num), function()
+    Env.register_safe_keybind(key, { Env.ModifierKey.CONTROL }, "load_preset_" .. tostring(num), function()
         if Config.load_preset(num) then
             Config.write()
             Env.run_on_game_thread("apply_preset_" .. tostring(num), function()

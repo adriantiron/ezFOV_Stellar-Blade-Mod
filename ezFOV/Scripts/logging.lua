@@ -25,7 +25,9 @@ function M.log_message(component, level, message, once_key, cache)
 
     if should_cache then
         local cache_key = tag .. "::" .. tostring(once_key)
-        if _log_once_cache[cache_key] then return end
+        if _log_once_cache[cache_key] then
+            return
+        end
         _log_once_cache[cache_key] = true
     end
 

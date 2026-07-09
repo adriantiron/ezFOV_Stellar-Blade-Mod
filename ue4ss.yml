@@ -1,0 +1,51 @@
+---
+# selene standard library describing the globals that UE4SS injects at runtime.
+# Extends the Lua 5.2 base (the closest built-in std to UE4SS's Lua 5.4 for
+# linting purposes; ezFOV uses no 5.3/5.4-only stdlib functions).
+# Docs: https://kampfkarren.github.io/selene/usage/std/
+base: lua52
+
+globals:
+  # --- Async / threading -------------------------------------------------
+  ExecuteInGameThread:
+    args:
+      - type: function
+  ExecuteWithDelay:
+    args:
+      - type: number
+      - type: function
+  CancelDelay:
+    args:
+      - type: any
+
+  # --- Input -------------------------------------------------------------
+  RegisterKeyBindAsync:
+    args:
+      - type: any
+      - type: any
+        required: false
+      - type: any
+        required: false
+  Key:
+    property: read-only
+  ModifierKey:
+    property: read-only
+
+  # --- Hooks -------------------------------------------------------------
+  RegisterHook:
+    args:
+      - type: string
+      - type: function
+      - type: function
+        required: false
+  UnregisterHook:
+    args:
+      - type: string
+      - type: any
+      - type: any
+        required: false
+
+  # --- Object discovery --------------------------------------------------
+  FindFirstOf:
+    args:
+      - type: string
