@@ -1,3 +1,4 @@
+--# selene: allow(global_usage, incorrect_standard_library_use)
 package.path = package.path .. ";./ezFOV/Scripts/?.lua;./ezFOV/Scripts/?/init.lua"
 
 -- Offline pre-deploy sanity test (heavier than in-game guards):
