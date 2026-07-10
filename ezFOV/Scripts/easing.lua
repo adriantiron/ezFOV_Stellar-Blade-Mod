@@ -1,6 +1,6 @@
--- Animation math & timing primitives shared by camera.lua's transition, enforcement,
--- and lock-on-exit blend loops. Deliberately pure and dependency-free so it can be
--- unit-tested in isolation.
+-- Animation math & timing primitives: quadratic easing (camera.lua's transition, enforcement,
+-- and lock-on-exit blend loops) and a monotonic millisecond clock (camera.lua and heartbeat.lua).
+-- Deliberately pure and dependency-free so it can be unit-tested in isolation.
 local Easing = {}
 
 local os_clock = os.clock

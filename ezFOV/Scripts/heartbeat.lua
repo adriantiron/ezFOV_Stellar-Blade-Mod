@@ -1,9 +1,10 @@
 local Logging = require("logging")
 local Env = require("env").bind("Heartbeat")
+local Easing = require("easing")
 
--- This caches the functions in memory, saving a microscopic amount of CPU every frame.
-local os_clock = os.clock
+-- Cache hot-path function references to save a microscopic amount of CPU every frame.
 local math_floor = math.floor
+local now_ms = Easing.now_ms
 
 -- Component-scoped logger (see Logging.for_component). warn is unused in this module.
 local log = Logging.for_component("Heartbeat")
@@ -28,10 +29,6 @@ local Heartbeat = {
         log.debug("Heartbeat disabled", "heartbeat_disabled")
     end,
 }
-
-local function now_ms()
-    return os_clock() * 1000.0
-end
 
 function Heartbeat._reset_buf()
     Heartbeat._buf = {}
