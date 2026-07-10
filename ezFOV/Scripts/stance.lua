@@ -22,19 +22,8 @@ local M = {
 
 local Camera, Config
 
--- Local helper logging functions to prefix messages with the module name and enforce level
-local function log_error(message, once_key)
-    Logging.log_error("Stance", message, once_key)
-end
-
-local function log_warn(message, once_key, cache)
-    Logging.log_warn("Stance", message, once_key, cache)
-end
-
-local function log_debug(message, once_key, cache)
-    Logging.log_debug("Stance", message, once_key, cache)
-end
--- ========================================================================================
+-- Component-scoped logger (see Logging.for_component).
+local log = Logging.for_component("Stance")
 
 local _ready_warned = false
 
@@ -68,7 +57,7 @@ local function ready()
     end
     if not Camera or not Config then
         if not _ready_warned then
-            log_warn("Stance helper was invoked before Camera/Config were initialized.", "stance_not_ready", true)
+            log.warn("Stance helper was invoked before Camera/Config were initialized.", "stance_not_ready", true)
             _ready_warned = true
         end
         return false
@@ -86,7 +75,7 @@ local function choose_profile(state, cfg)
 
     local current_cfg = cfg or (Config and Config.get())
     if not current_cfg or type(current_cfg) ~= "table" or type(current_cfg.fovs) ~= "table" then
-        log_error(
+        log.error(
             "Profile selection aborted because the runtime config is invalid.",
             "stance_choose_profile_missing_cfg"
         )
@@ -104,7 +93,7 @@ local function choose_profile(state, cfg)
         if since_last < _LOCKON_EXIT_GRACE then
             if not _grace_logged then
                 _grace_logged = true
-                log_debug(
+                log.debug(
                     string.format(
                         "Lock-on grace period active (%.0fms remaining)",
                         (_LOCKON_EXIT_GRACE - since_last) * 1000
@@ -115,7 +104,7 @@ local function choose_profile(state, cfg)
             end
             return M.PROFILES.lockon
         end
-        log_debug("Lock-on grace period expired, exiting lock-on", "lockon_grace_expired", true)
+        log.debug("Lock-on grace period expired, exiting lock-on", "lockon_grace_expired", true)
     end
 
     if state.battle == true then
@@ -163,7 +152,7 @@ local function apply_fov_transition(target_fov, steps_override)
         return
     end
     if not Camera or not Camera.set_fov_via_function then
-        log_error(
+        log.error(
             "Unable to apply an FOV transition because the camera module is unavailable.",
             "stance_missing_camera_fov"
         )
@@ -172,7 +161,7 @@ local function apply_fov_transition(target_fov, steps_override)
 
     local cfg = Config.get()
     if not cfg or type(cfg) ~= "table" then
-        log_error("Unable to apply an FOV transition because the config is invalid.", "stance_apply_fov_missing_cfg")
+        log.error("Unable to apply an FOV transition because the config is invalid.", "stance_apply_fov_missing_cfg")
         return
     end
     local steps = steps_override or cfg.FOVTransitionSteps
@@ -202,7 +191,7 @@ local function apply_position_for_profile(profile, cfg, steps_override)
 
     if pos then
         if not Camera or not Camera.set_camera_relative_location then
-            log_error(
+            log.error(
                 "Unable to apply a camera position transition because the camera module is unavailable.",
                 "stance_missing_camera_position"
             )
@@ -217,7 +206,7 @@ end
 
 local function apply_lockon_profile(cfg)
     if not Camera or not Camera.start_enforcement then
-        log_error(
+        log.error(
             "Unable to enter lock-on mode because the camera module is unavailable.",
             "stance_missing_camera_start"
         )
@@ -294,7 +283,7 @@ local function apply_profile(profile, cfg)
         Env.run_on_game_thread("stance_lockon_exit_blend", function()
             local started = Camera.begin_lockon_exit_blend(target_pos, target_fov, nil, cfg.LockOnExitBlendTime)
             if not started then
-                log_warn(
+                log.warn(
                     "Lock-on exit blend could not start; falling back to the standard transition path.",
                     "lockon_exit_fallback",
                     true
@@ -336,7 +325,7 @@ function M.pulse()
 
     local cfg = Config.get()
     if not cfg or type(cfg) ~= "table" or type(cfg.fovs) ~= "table" then
-        log_error("Stance pulse aborted because the runtime config is invalid.", "stance_pulse_missing_cfg")
+        log.error("Stance pulse aborted because the runtime config is invalid.", "stance_pulse_missing_cfg")
         return
     end
 
@@ -377,7 +366,7 @@ function M.pulse()
         end
         transitioning = (transition_state == true)
     else
-        log_warn(
+        log.warn(
             "Pulse post-apply is missing Camera.is_transitioning; skipping transition-aware enforcement.",
             "pulse_missing_transition_fn",
             true
@@ -397,7 +386,7 @@ function M.pulse()
         if target_or_err ~= nil then
             Env.run_on_game_thread("stance_enforce_fov", function()
                 if not Camera or type(Camera.enforce_fov) ~= "function" then
-                    log_error(
+                    log.error(
                         "Pulse post-apply cannot enforce FOV because Camera.enforce_fov is unavailable.",
                         "pulse_missing_enforce_fov"
                     )
@@ -406,7 +395,7 @@ function M.pulse()
                 Camera.enforce_fov(target_or_err)
             end)
         else
-            log_warn("Pulse post-apply resolved a nil target FOV; skipping enforcement.", "pulse_post_nil_target", true)
+            log.warn("Pulse post-apply resolved a nil target FOV; skipping enforcement.", "pulse_post_nil_target", true)
         end
     end
 end

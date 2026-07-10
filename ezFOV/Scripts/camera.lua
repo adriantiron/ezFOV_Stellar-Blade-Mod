@@ -80,19 +80,8 @@ local _lockon_diag_last = {
 local _COLLISION_WARN_INTERVAL_SEC = 5.0
 local _LOCKON_DIAG_INTERVAL_SEC = 0.75
 
-local function log_error(message, once_key)
-    Logging.log_error("Camera", message, once_key)
-end
-
--- Local helper logging functions to prefix messages with the module name and enforce level
-local function log_warn(message, once_key, cache)
-    Logging.log_warn("Camera", message, once_key, cache)
-end
-
-local function log_debug(message, once_key, cache)
-    Logging.log_debug("Camera", message, once_key, cache)
-end
--- ========================================================================================
+-- Component-scoped logger (see Logging.for_component).
+local log = Logging.for_component("Camera")
 
 local function obj_is_valid(obj)
     if not obj then
@@ -111,7 +100,7 @@ local function safe_write(fn, context, once_key)
     local ok, err = pcall(fn)
     if not ok then
         local ctx = context or "property_write"
-        log_warn(
+        log.warn(
             ctx .. " failed (object likely mid-destruction): " .. tostring(err),
             once_key or ("safe_write_fail_" .. ctx),
             true
@@ -127,7 +116,7 @@ local function collision_warn_throttled(slot, message)
         return
     end
     _collision_warn_last[slot] = now
-    log_warn(message)
+    log.warn(message)
 end
 
 local function lockon_diag_debug(slot, message)
@@ -137,7 +126,7 @@ local function lockon_diag_debug(slot, message)
         return
     end
     _lockon_diag_last[slot] = now
-    log_debug(message, "lockon_diag_" .. tostring(slot), true)
+    log.debug(message, "lockon_diag_" .. tostring(slot), true)
 end
 
 local function lockon_diag_warn(slot, message)
@@ -147,7 +136,7 @@ local function lockon_diag_warn(slot, message)
         return
     end
     _lockon_diag_last[slot] = now
-    log_warn(message)
+    log.warn(message)
 end
 
 local function lockon_diag_ref_loss(slot, message, miss_count)
@@ -182,7 +171,7 @@ local function get_camera_yaw_raw(snap)
         _yaw_fn = function(s)
             return s.pc:GetControlRotation().Yaw
         end
-        log_debug("Yaw source resolved via GetControlRotation()", "yaw_source_rotation", true)
+        log.debug("Yaw source resolved via GetControlRotation()", "yaw_source_rotation", true)
         return tonumber(rot1.Yaw) or 0
     end
 
@@ -193,7 +182,7 @@ local function get_camera_yaw_raw(snap)
         _yaw_fn = function(s)
             return s.boom:K2_GetComponentRotation().Yaw
         end
-        log_debug("Yaw source resolved via boom K2_GetComponentRotation()", "yaw_source_boom", true)
+        log.debug("Yaw source resolved via boom K2_GetComponentRotation()", "yaw_source_boom", true)
         return tonumber(rot2.Yaw) or 0
     end
 
@@ -204,11 +193,11 @@ local function get_camera_yaw_raw(snap)
         _yaw_fn = function(s)
             return s.cam:K2_GetComponentRotation().Yaw
         end
-        log_debug("Yaw source resolved via cam K2_GetComponentRotation()", "yaw_source_cam", true)
+        log.debug("Yaw source resolved via cam K2_GetComponentRotation()", "yaw_source_cam", true)
         return tonumber(rot3.Yaw) or 0
     end
 
-    log_error(
+    log.error(
         "Unable to locate a valid camera yaw source across the known engine methods; yaw-based bias and lock-on positioning may be unstable.",
         "yaw_source_failure"
     )
@@ -296,7 +285,7 @@ local function save_originals(snap)
     _saved_originals = {}
 
     if not snap then
-        log_error("Cannot save camera originals because the snapshot is unavailable.", "save_originals_no_snapshot")
+        log.error("Cannot save camera originals because the snapshot is unavailable.", "save_originals_no_snapshot")
         return
     end
 
@@ -369,7 +358,7 @@ end
 
 function M.set_fov_via_function(target_fov, overrideSteps)
     if PlayerCtx.camera_or_pc_invalid() then
-        log_warn(
+        log.warn(
             "FOV transition aborted because the player camera context is unavailable.",
             "fov_transition_invalid_context"
         )
@@ -378,7 +367,7 @@ function M.set_fov_via_function(target_fov, overrideSteps)
 
     local snap = PlayerCtx.get_snapshot()
     if not snap then
-        log_warn(
+        log.warn(
             "FOV transition aborted because the camera snapshot is unavailable.",
             "fov_transition_invalid_snapshot"
         )
@@ -387,7 +376,7 @@ function M.set_fov_via_function(target_fov, overrideSteps)
 
     local cam = snap.cam
     if not obj_is_valid(cam) then
-        log_warn("FOV transition aborted because the camera component is invalid.", "fov_transition_invalid_cam")
+        log.warn("FOV transition aborted because the camera component is invalid.", "fov_transition_invalid_cam")
         return
     end
 
@@ -443,7 +432,7 @@ end
 
 function M.set_camera_relative_location(target_position, overrideSteps)
     if PlayerCtx.camera_or_pc_invalid() then
-        log_warn(
+        log.warn(
             "Camera position transition aborted because the camera context is unavailable.",
             "camera_rel_loc_invalid_context",
             true
@@ -453,7 +442,7 @@ function M.set_camera_relative_location(target_position, overrideSteps)
 
     local snap = PlayerCtx.get_snapshot()
     if not snap then
-        log_warn(
+        log.warn(
             "Camera position transition aborted because the camera snapshot is unavailable.",
             "camera_rel_loc_no_snapshot",
             true
@@ -463,7 +452,7 @@ function M.set_camera_relative_location(target_position, overrideSteps)
 
     local cam = snap.cam
     if not obj_is_valid(cam) then
-        log_warn(
+        log.warn(
             "Camera position transition aborted because the camera component is invalid.",
             "camera_rel_loc_invalid_cam",
             true
@@ -473,7 +462,7 @@ function M.set_camera_relative_location(target_position, overrideSteps)
 
     local loc = cam and cam.RelativeLocation
     if not loc then
-        log_warn("Camera position transition aborted because RelativeLocation is unavailable.", "camera_loc_missing")
+        log.warn("Camera position transition aborted because RelativeLocation is unavailable.", "camera_loc_missing")
         PlayerCtx.temporarily_disable()
         return
     end
@@ -624,7 +613,7 @@ function M.set_camera_relative_location(target_position, overrideSteps)
                     and math_abs(M._active_target_position.y - to.y) < 0.01
                     and math_abs(M._active_target_position.z - to.z) < 0.01
                 then
-                    log_warn(
+                    log.warn(
                         string.format(
                             "Camera position interpolation drifted beyond safe bounds (dx:%.1f, dy:%.1f, dz:%.1f); re-syncing from the current camera state.",
                             dx,
@@ -688,7 +677,7 @@ end
 
 function M.init(cfg)
     if not cfg then
-        log_error("Camera initialization aborted because no config was provided.", "camera_init_missing_cfg")
+        log.error("Camera initialization aborted because no config was provided.", "camera_init_missing_cfg")
         return
     end
 
@@ -713,7 +702,7 @@ end
 
 function M.enforce_fov(target_fov)
     if PlayerCtx.camera_or_pc_invalid() then
-        log_warn(
+        log.warn(
             "FOV enforcement skipped because the camera context is unavailable.",
             "enforce_fov_invalid_context",
             true
@@ -726,14 +715,14 @@ function M.enforce_fov(target_fov)
 
     local snap = PlayerCtx.get_snapshot()
     if not snap then
-        log_warn("FOV enforcement skipped because the camera snapshot is unavailable.", "enforce_fov_no_snapshot", true)
+        log.warn("FOV enforcement skipped because the camera snapshot is unavailable.", "enforce_fov_no_snapshot", true)
         return
     end
     local cam = snap.cam
 
     -- Hard validation check before accessing properties
     if not obj_is_valid(cam) then
-        log_warn("FOV enforcement skipped because the camera component is invalid.", "enforce_fov_invalid_cam", true)
+        log.warn("FOV enforcement skipped because the camera component is invalid.", "enforce_fov_invalid_cam", true)
         return
     end
 
@@ -824,7 +813,7 @@ end
 
 function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, duration_override)
     if PlayerCtx.camera_or_pc_invalid() then
-        log_warn(
+        log.warn(
             "Lock-on exit blend skipped because the camera context is unavailable.",
             "lockon_exit_invalid_context",
             true
@@ -839,7 +828,7 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
 
     local snap = PlayerCtx.get_snapshot()
     if not snap then
-        log_warn(
+        log.warn(
             "Lock-on exit blend skipped because the camera snapshot is unavailable.",
             "lockon_exit_no_snapshot",
             true
@@ -849,7 +838,7 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
 
     local cam = snap.cam
     if not obj_is_valid(cam) then
-        log_warn("Lock-on exit blend skipped because the camera component is invalid.", "lockon_exit_invalid_cam", true)
+        log.warn("Lock-on exit blend skipped because the camera component is invalid.", "lockon_exit_invalid_cam", true)
         return false
     end
 
@@ -881,7 +870,7 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
     end
 
     if to_fov == nil and (not to_pos or (to_pos.x == 0 and to_pos.y == 0 and to_pos.z == 0)) then
-        log_warn(
+        log.warn(
             "Lock-on exit blend skipped because there was no valid target FOV or position.",
             "lockon_exit_missing_target",
             true
@@ -1033,7 +1022,7 @@ function M.start_enforcement(pos, fov)
     -- Read biases from config
     local cfg = require("config").get()
     if not cfg then
-        log_error(
+        log.error(
             "Lock-on enforcement could not start because the config module returned no data.",
             "enforcement_start_missing_cfg"
         )
@@ -1230,7 +1219,7 @@ function M.stop_enforcement()
     if was_active then
         -- Force the restoration helper to run inside the thread worker
         restore_originals()
-        log_debug("Enforcement stopped and original camera state restoration was requested.", "enforce_stop")
+        log.debug("Enforcement stopped and original camera state restoration was requested.", "enforce_stop")
     end
 end
 

@@ -1,5 +1,7 @@
 local Logging = require("logging")
 
+-- selene: allow(global_usage)
+-- intentional host boundary
 local Env = {
     ExecuteInGameThread = rawget(_G, "ExecuteInGameThread"),
     ExecuteWithDelay = rawget(_G, "ExecuteWithDelay"),

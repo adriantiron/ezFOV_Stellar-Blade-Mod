@@ -28,19 +28,8 @@ local Bootstrap = {
     post_pulse_token = nil,
 }
 
--- Local helper logging functions to prefix messages with the module name and enforce level
-local function log_error(message, once_key)
-    Logging.log_error("Hooks", message, once_key)
-end
-
-local function log_warn(message, once_key, cache)
-    Logging.log_warn("Hooks", message, once_key, cache)
-end
-
-local function log_debug(message, once_key, cache)
-    Logging.log_debug("Hooks", message, once_key, cache)
-end
--- ========================================================================================
+-- Component-scoped logger (see Logging.for_component).
+local log = Logging.for_component("Hooks")
 
 local function safe_register_hook(func_path, pre_cb, post_cb)
     return Env.safe_register_hook(func_path, pre_cb, post_cb)
@@ -93,7 +82,7 @@ local function set_bootstrap_state(new_state, reason)
     end
 
     if is_valid_bootstrap_transition(prev, new_state) then
-        log_debug(
+        log.debug(
             "Bootstrap transition "
                 .. tostring(prev)
                 .. " -> "
@@ -104,7 +93,7 @@ local function set_bootstrap_state(new_state, reason)
             "bootstrap_transition_" .. tostring(prev) .. "_to_" .. tostring(new_state)
         )
     else
-        log_warn(
+        log.warn(
             "Bootstrap INVALID transition "
                 .. tostring(prev)
                 .. " -> "
@@ -167,7 +156,7 @@ function H.defer_stance_pulse(duration_ms, reason)
     -- Wrapper blocks while (now - last_state_change) < STATE_CHANGE_COOLDOWN,
     -- so shift by cooldown to make external defer duration match requested ms.
     last_state_change = os_clock() + (ms / 1000.0) - STATE_CHANGE_COOLDOWN
-    log_debug(
+    log.debug(
         "Hooks stance pulse deferred for "
             .. tostring(math.floor(ms))
             .. "ms ("
@@ -179,10 +168,10 @@ function H.defer_stance_pulse(duration_ms, reason)
 end
 
 function H.init(Camera, Config)
-    log_debug("Hooks init: starting initialization", "hooks_init_start")
+    log.debug("Hooks init: starting initialization", "hooks_init_start")
 
     if not Camera or not Config then
-        log_error(
+        log.error(
             "Hooks initialization aborted because the camera or config dependency was missing.",
             "hooks_init_missing_dependencies"
         )
@@ -190,7 +179,7 @@ function H.init(Camera, Config)
     end
 
     if H._initialized then
-        log_debug("Hooks already initialized; skipping duplicate registration", "hooks_init_duplicate")
+        log.debug("Hooks already initialized; skipping duplicate registration", "hooks_init_duplicate")
         return
     end
 
@@ -198,14 +187,14 @@ function H.init(Camera, Config)
     H.ConfigMod = Config
     reset_bootstrap()
 
-    log_debug("Hooks init: clearing previously registered hooks", "hooks_init_clear_old")
+    log.debug("Hooks init: clearing previously registered hooks", "hooks_init_clear_old")
     for _, entry in pairs(H._hook_ids) do
         unregister_hook(entry)
     end
     H._hook_ids = {}
 
     PlayerCtx.init()
-    log_debug("Hooks init: PlayerCtx initialized", "hooks_init_playerctx")
+    log.debug("Hooks init: PlayerCtx initialized", "hooks_init_playerctx")
 
     local original_pulse = Stance.pulse
     rawset(Stance, "pulse", function()
@@ -222,10 +211,10 @@ function H.init(Camera, Config)
             last_state_change = now
         end
     end)
-    log_debug("Hooks init: Stance pulse wrapper installed", "hooks_init_pulse_wrap")
+    log.debug("Hooks init: Stance pulse wrapper installed", "hooks_init_pulse_wrap")
 
     Stance.init(Camera, Config)
-    log_debug("Hooks init: Stance initialized", "hooks_init_stance")
+    log.debug("Hooks init: Stance initialized", "hooks_init_stance")
 
     -- -------------------------------------------------------------------------
     -- ClientRestart Hook
@@ -235,7 +224,7 @@ function H.init(Camera, Config)
         H._hook_ids.client_restart.path,
         function(self, NewPawn)
             Env.run_now("client_restart_hook", function()
-                log_debug("ClientRestart: clearing caches and stopping enforcement", "client_restart")
+                log.debug("ClientRestart: clearing caches and stopping enforcement", "client_restart")
                 if H.Camera and H.Camera.stop_enforcement then
                     H.Camera.stop_enforcement()
                 end
@@ -251,7 +240,7 @@ function H.init(Camera, Config)
         end
     )
 
-    log_debug(
+    log.debug(
         "Hooks init: ClientRestart hook registered pre="
             .. tostring(H._hook_ids.client_restart.pre_id)
             .. " post="
@@ -282,7 +271,7 @@ function H.init(Camera, Config)
                         if tps == false and inBattle == false then
                             local cfg = H.ConfigMod.get()
                             if not cfg or type(cfg) ~= "table" then
-                                log_error(
+                                log.error(
                                     "Cold apply skipped because the runtime config is invalid.",
                                     "cold_apply_missing_cfg"
                                 )
@@ -303,7 +292,7 @@ function H.init(Camera, Config)
 
                             if not cam_ok then
                                 set_bootstrap_state(BOOTSTRAP_IDLE, "cold_apply_schedule_failed")
-                                log_warn("Cold-apply deferred: Camera interface not ready yet.", "cold_apply_defer")
+                                log.warn("Cold-apply deferred: Camera interface not ready yet.", "cold_apply_defer")
                             end
                         end
                     end
@@ -319,7 +308,7 @@ function H.init(Camera, Config)
         end
     )
 
-    log_debug(
+    log.debug(
         "Hooks init: IsBlockingMode hook registered pre="
             .. tostring(H._hook_ids.blocking_mode.pre_id)
             .. " post="
@@ -328,7 +317,7 @@ function H.init(Camera, Config)
     )
 
     H._initialized = true
-    log_debug("Hooks init: initialization complete", "hooks_init_complete")
+    log.debug("Hooks init: initialization complete", "hooks_init_complete")
 end
 
 return H

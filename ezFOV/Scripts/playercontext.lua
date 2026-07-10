@@ -18,19 +18,8 @@ local PlayerCtx = {
     },
 }
 
--- Local helper logging functions to prefix messages with the module name and enforce level
-local function log_error(message, once_key)
-    Logging.log_error("PlayerCtx", message, once_key)
-end
-
-local function log_warn(message, once_key, cache)
-    Logging.log_warn("PlayerCtx", message, once_key, cache)
-end
-
-local function log_debug(message, once_key, cache)
-    Logging.log_debug("PlayerCtx", message, once_key, cache)
-end
--- ========================================================================================
+-- Component-scoped logger (see Logging.for_component).
+local log = Logging.for_component("PlayerCtx")
 
 local function _drop_caches()
     PlayerCtx._pc = nil
@@ -50,7 +39,7 @@ local function _notify_disable()
     for i = 1, #PlayerCtx._on_disable do
         local ok, err = pcall(PlayerCtx._on_disable[i])
         if not ok then
-            log_error("on_disable handler error: " .. tostring(err), "on_disable_handler_error")
+            log.error("on_disable handler error: " .. tostring(err), "on_disable_handler_error")
         end
     end
 end
@@ -115,7 +104,7 @@ end
 
 function PlayerCtx.force_disable(reason)
     if reason then
-        log_warn("force_disable: " .. tostring(reason), "force_disable")
+        log.warn("force_disable: " .. tostring(reason), "force_disable")
     end
     if not PlayerCtx._disabled then
         PlayerCtx._disabled = true
@@ -149,7 +138,7 @@ function PlayerCtx.get_pc()
         return FindFirstOf("SBPlayerController")
     end)
     if not ok or not obj_is_valid(pc) then
-        log_debug("get_pc: SBPlayerController not ready yet", "pc_missing", true)
+        log.debug("get_pc: SBPlayerController not ready yet", "pc_missing", true)
         return nil
     end
     PlayerCtx._pc = pc
@@ -163,7 +152,7 @@ function PlayerCtx.get_pawn()
 
     local pc = PlayerCtx.get_pc()
     if not pc or not obj_is_valid(pc) then
-        log_debug("get_pawn: no player controller yet", "pawn_no_pc", true)
+        log.debug("get_pawn: no player controller yet", "pawn_no_pc", true)
         PlayerCtx._pc = nil
         clear_pawn_caches()
         return nil
@@ -175,7 +164,7 @@ function PlayerCtx.get_pawn()
     end)
     if not ok_engine or not engine_pawn then
         if not ok_engine then
-            log_warn(
+            log.warn(
                 "get_pawn: failed to read pc.Pawn; clearing pawn caches. hb_disabled="
                     .. tostring(Heartbeat.is_disabled()),
                 "pawn_read_failed",
@@ -189,7 +178,7 @@ function PlayerCtx.get_pawn()
     -- 2. If the engine's pawn doesn't match our cache, our cache is stale/dead.
     -- We never dereference the old cached pawn here; we only compare the raw pointer identity.
     if PlayerCtx._pawn ~= engine_pawn then
-        log_debug("get_pawn: pawn reference changed; updating cache", "pawn_changed", true)
+        log.debug("get_pawn: pawn reference changed; updating cache", "pawn_changed", true)
         PlayerCtx._pawn = engine_pawn
         -- Only clear child components so they fetch fresh from the new pawn next time
         PlayerCtx._cam = nil
@@ -199,7 +188,7 @@ function PlayerCtx.get_pawn()
 
     -- 3. Only after the pointer has been updated do we validate the new object.
     if not obj_is_valid(PlayerCtx._pawn) then
-        log_debug("get_pawn: engine pawn invalid", "pawn_missing", true)
+        log.debug("get_pawn: engine pawn invalid", "pawn_missing", true)
         clear_pawn_caches()
         clear_lockon_caches()
         return nil
@@ -218,7 +207,7 @@ function PlayerCtx.get_camera()
 
     local pawn = PlayerCtx.get_pawn()
     if not pawn then
-        log_debug("get_camera: no pawn yet", "cam_no_pawn", true)
+        log.debug("get_camera: no pawn yet", "cam_no_pawn", true)
         return nil
     end
 
@@ -226,7 +215,7 @@ function PlayerCtx.get_camera()
         return pawn.FollowCamera
     end)
     if not ok or not obj_is_valid(cam) then
-        log_debug("get_camera: FollowCamera not ready yet", "cam_missing", true)
+        log.debug("get_camera: FollowCamera not ready yet", "cam_missing", true)
         return nil
     end
     PlayerCtx._cam = cam
@@ -243,7 +232,7 @@ function PlayerCtx.get_camera_boom()
 
     local pawn = PlayerCtx.get_pawn()
     if not pawn then
-        log_debug("get_camera_boom: no pawn yet", "boom_no_pawn", true)
+        log.debug("get_camera_boom: no pawn yet", "boom_no_pawn", true)
         return nil
     end
 
@@ -251,7 +240,7 @@ function PlayerCtx.get_camera_boom()
         return pawn.CameraBoom
     end)
     if not ok or not obj_is_valid(boom) then
-        log_debug("get_camera_boom: CameraBoom not ready yet", "boom_missing", true)
+        log.debug("get_camera_boom: CameraBoom not ready yet", "boom_missing", true)
         return nil
     end
     PlayerCtx._boom = boom
@@ -272,7 +261,7 @@ function PlayerCtx.is_tps_mode()
     if ok then
         return result
     end
-    log_warn(
+    log.warn(
         "is_tps_mode: engine call failed while reading TPS state. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
         "tps_mode_read_failed",
         true
@@ -294,7 +283,7 @@ function PlayerCtx.is_battle()
     if ok then
         return result
     end
-    log_warn(
+    log.warn(
         "is_battle: engine call failed while reading battle state. hb_disabled=" .. tostring(Heartbeat.is_disabled()),
         "battle_state_read_failed",
         true
@@ -323,7 +312,7 @@ function PlayerCtx.is_lock_on()
         if ok then
             return result
         end
-        log_warn(
+        log.warn(
             "is_lock_on: cached lock-on probe failed; retrying method discovery. hb_disabled="
                 .. tostring(Heartbeat.is_disabled()),
             "lockon_probe_failed",
@@ -345,7 +334,7 @@ function PlayerCtx.is_lock_on()
         _lockon_fn = function(p)
             return p.bLockOn
         end
-        log_debug("Lock-on detection: using bLockOn property", "lockon_detect_bLockOn", true)
+        log.debug("Lock-on detection: using bLockOn property", "lockon_detect_bLockOn", true)
         return val_bl
     end
 
@@ -373,7 +362,7 @@ function PlayerCtx.is_lock_on()
         local ok, result = pcall(m.fn, pawn)
         if ok then
             _lockon_fn = m.fn
-            log_debug("Lock-on detection: using " .. m.name .. "()", "lockon_detect_" .. m.name)
+            log.debug("Lock-on detection: using " .. m.name .. "()", "lockon_detect_" .. m.name)
             return result
         end
     end
@@ -392,13 +381,13 @@ function PlayerCtx.is_lock_on()
             end
             return true
         end
-        log_debug("Lock-on detection: using LockOnCharacter property", "lockon_detect_LockOnCharacter")
+        log.debug("Lock-on detection: using LockOnCharacter property", "lockon_detect_LockOnCharacter")
         return _lockon_fn(pawn)
     end
 
     _lockon_fn = nil
     _lockon_tried = false
-    log_warn("No lock-on detection method found!", "lockon_detect_none")
+    log.warn("No lock-on detection method found!", "lockon_detect_none")
     return nil
 end
 
@@ -452,7 +441,7 @@ function PlayerCtx.get_locomotion_state()
     end)
     if not ok_cm or not cm or (not obj_is_valid(cm)) then
         if not ok_cm then
-            log_warn(
+            log.warn(
                 "get_locomotion_state: failed to read CharacterMovement. hb_disabled="
                     .. tostring(Heartbeat.is_disabled()),
                 "loco_character_movement_read_failed",
@@ -467,7 +456,7 @@ function PlayerCtx.get_locomotion_state()
     end)
     if not ok_v or not v then
         if not ok_v then
-            log_warn(
+            log.warn(
                 "get_locomotion_state: failed to read movement velocity. hb_disabled="
                     .. tostring(Heartbeat.is_disabled()),
                 "loco_velocity_read_failed",

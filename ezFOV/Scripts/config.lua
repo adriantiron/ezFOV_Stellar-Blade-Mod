@@ -40,19 +40,8 @@ local DEFAULTS = {
     LockOnPitchBias = 0,
 }
 
-local function log_error(message, once_key)
-    Logging.log_error("Config", message, once_key)
-end
-
--- Local helper logging functions to prefix messages with the module name and enforce level
-local function log_warn(message, once_key, cache)
-    Logging.log_warn("Config", message, once_key, cache)
-end
-
-local function log_debug(message, once_key, cache)
-    Logging.log_debug("Config", message, once_key, cache)
-end
--- ========================================================================================
+-- Component-scoped logger (see Logging.for_component).
+local log = Logging.for_component("Config")
 
 local function sanitize_number(n)
     return type(n) == "number" and n or tonumber(n) or 0
@@ -233,7 +222,7 @@ local function load_file(path, container)
 
     if not success then
         if not _config_corrupt_warned then
-            log_error(
+            log.error(
                 "Core syntax error or corruption detected in ezFOV.cfg; falling back to factory defaults.",
                 "config_corrupt_fallback"
             )
@@ -273,7 +262,7 @@ function M.write()
 
         local cfg = M.get()
         if not cfg or type(cfg) ~= "table" then
-            log_error(
+            log.error(
                 "Config file write failed because the runtime config is invalid.",
                 "config_write_timer_missing_cfg"
             )
@@ -282,7 +271,7 @@ function M.write()
 
         local f = io.open(cfg.path, "w")
         if not f then
-            log_error("Could not open config file for writing.", "config_write_open_failed")
+            log.error("Could not open config file for writing.", "config_write_open_failed")
             return
         end
 
@@ -410,7 +399,7 @@ function M.write()
         f:write("EnableLockOnCamera=" .. tostring(cfg.EnableLockOnCamera) .. "\n")
 
         f:close()
-        log_debug("Saved config to " .. cfg.path, "config_write_saved")
+        log.debug("Saved config to " .. cfg.path, "config_write_saved")
     end)
 end
 
@@ -420,7 +409,7 @@ function M.save_preset(num)
         local p = cfg.path .. "_preset" .. tostring(num)
         local f = io.open(p, "w")
         if not f then
-            log_error(format("Could not save preset %d.", num), "preset_save_open_failed")
+            log.error(format("Could not save preset %d.", num), "preset_save_open_failed")
             return
         end
 
@@ -492,18 +481,18 @@ function M.save_preset(num)
         f:write("EnableLockOnCamera=" .. tostring(cfg.EnableLockOnCamera) .. "\n")
 
         f:close()
-        log_debug(format("Saved preset %d.", num), "preset_saved")
+        log.debug(format("Saved preset %d.", num), "preset_saved")
     end)
 
     if not ok then
-        log_error(format("Preset %d save failed: %s", num, tostring(err)), "preset_save_failed")
+        log.error(format("Preset %d save failed: %s", num, tostring(err)), "preset_save_failed")
     end
 end
 
 function M.load_preset(num)
     local cfg = M.get()
     if not cfg or type(cfg) ~= "table" or type(cfg.fovs) ~= "table" then
-        log_error(
+        log.error(
             format("Preset %d load failed because the runtime config is invalid.", num),
             "preset_load_missing_cfg"
         )
@@ -514,7 +503,7 @@ function M.load_preset(num)
 
     local test = io.open(p, "r")
     if not test then
-        log_warn(format("Preset %d was not found.", num), "preset_not_found")
+        log.warn(format("Preset %d was not found.", num), "preset_not_found")
         return false
     end
     test:close()
@@ -526,7 +515,7 @@ function M.load_preset(num)
         return load_file(p, container)
     end)
     if not ok or not loaded or type(loaded.fovs) ~= "table" then
-        log_error(format("Preset %d file is malformed or has invalid structure.", num), "preset_invalid")
+        log.error(format("Preset %d file is malformed or has invalid structure.", num), "preset_invalid")
         return false
     end
 
@@ -551,7 +540,7 @@ function M.load_preset(num)
     cfg.LockOnYawBias = loaded.LockOnYawBias
     cfg.LockOnPitchBias = loaded.LockOnPitchBias
 
-    log_debug(format("Successfully initialized and switched to preset %d.", num), "preset_loaded")
+    log.debug(format("Successfully initialized and switched to preset %d.", num), "preset_loaded")
     return true
 end
 

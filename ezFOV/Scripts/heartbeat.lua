@@ -5,19 +5,8 @@ local Env = require("env").bind("Heartbeat")
 local os_clock = os.clock
 local math_floor = math.floor
 
--- Local helper logging functions to prefix messages with the module name and enforce level
-local function log_error(message, once_key)
-    Logging.log_error("Heartbeat", message, once_key)
-end
-
-local function log_warn(message, once_key, cache)
-    Logging.log_warn("Heartbeat", message, once_key, cache)
-end
-
-local function log_debug(message, once_key, cache)
-    Logging.log_debug("Heartbeat", message, once_key, cache)
-end
--- ========================================================================================
+-- Component-scoped logger (see Logging.for_component). warn is unused in this module.
+local log = Logging.for_component("Heartbeat")
 
 local Heartbeat = {
     disabled = true,
@@ -33,10 +22,10 @@ local Heartbeat = {
     _drop_token = nil,
 
     on_enabled = function()
-        log_debug("Heartbeat enabled", "heartbeat_enabled")
+        log.debug("Heartbeat enabled", "heartbeat_enabled")
     end,
     on_disabled = function()
-        log_debug("Heartbeat disabled", "heartbeat_disabled")
+        log.debug("Heartbeat disabled", "heartbeat_disabled")
     end,
 }
 
@@ -70,7 +59,7 @@ end
 
 function Heartbeat.pulse()
     if not Heartbeat or type(Heartbeat) ~= "table" then
-        log_error("Heartbeat.pulse() called but Heartbeat table is invalid.", "heartbeat_invalid")
+        log.error("Heartbeat.pulse() called but Heartbeat table is invalid.", "heartbeat_invalid")
         return
     end
 

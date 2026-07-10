@@ -193,6 +193,19 @@ local function run_tests()
     end)
     assert(#error_logs == 2, "errors should always emit even with matching once key")
 
+    -- for_component: bound logger carries the component tag and forwards to log_*
+    assert(type(Logging.for_component) == "function", "logging module should expose for_component")
+    local bound = Logging.for_component("SanityBound")
+    assert(
+        type(bound.error) == "function" and type(bound.warn) == "function" and type(bound.debug) == "function",
+        "for_component should expose error/warn/debug"
+    )
+    local bound_logs = with_captured_print(function()
+        bound.debug("bound message")
+    end)
+    assert(#bound_logs == 1, "for_component logger should emit a line")
+    assert(bound_logs[1]:find("SanityBound", 1, true) ~= nil, "for_component log should carry the component tag")
+
     -- Env guard behavior checks
     local ran_immediate = false
     assert_true(

@@ -47,6 +47,22 @@ function M.log_debug(component, message, once_key, cache)
     M.log_message(component, "DEBUG", message, once_key, cache)
 end
 
+-- Returns a logger bound to a component name so callers don't repeat the tag.
+-- Each function mirrors the matching M.log_* minus the leading component argument.
+function M.for_component(component)
+    return {
+        error = function(message, once_key)
+            M.log_error(component, message, once_key)
+        end,
+        warn = function(message, once_key, cache)
+            M.log_warn(component, message, once_key, cache)
+        end,
+        debug = function(message, once_key, cache)
+            M.log_debug(component, message, once_key, cache)
+        end,
+    }
+end
+
 function M.clear_once_cache()
     _log_once_cache = {}
 end
