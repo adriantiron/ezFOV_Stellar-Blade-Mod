@@ -25,13 +25,30 @@ local FOV_CLAMP = { min = Constants.FOV_MIN, max = Constants.FOV_MAX }
 --   clamp   { min, max } enforced when a value is read
 --   floor   lower bound enforced when a value is read (e.g. blend time)
 --   section short comment block written before this key in the full file (omitted from presets)
+
+-- A horizontal rule (81 dashes) that frames section banners in the generated .cfg; its width
+-- matches the top/bottom header borders so the whole file lines up.
+local RULE = "; " .. string.rep("-", 81)
+
+-- Build a bordered section banner: an opening RULE, the given comment lines, then a closing RULE.
+-- Keeping the repeated border here lets each schema section read as just its comment text.
+local function banner(...)
+    local lines = { RULE, ... }
+    lines[#lines + 1] = RULE
+    return table.concat(lines, "\n")
+end
+
 local SCHEMA = {
     {
         key = "DisableCameraCollision",
         path = { "DisableCameraCollision" },
         kind = "bool",
         default = false,
-        section = "; --- CAMERA COLLISION ---\n; Set true for uninterrupted cinematic framing (camera won't push in on walls).",
+        section = banner(
+            "; CAMERA COLLISION",
+            "; Prevents the camera from clipping or snapping aggressively forward when hitting",
+            "; walls or geometry. Set to true for an unhindered cinematic framing."
+        ),
     },
 
     {
@@ -40,7 +57,7 @@ local SCHEMA = {
         kind = "number",
         default = 0,
         fmt = "%.4f",
-        section = "; --- DEFAULT CAMERA OFFSETS (exploration & idle) ---",
+        section = banner("; DEFAULT CAMERA OFFSETS (Exploration & Idle)"),
     },
     { key = "DefaultCamY", path = { "DefaultPosition", "y" }, kind = "number", default = 0, fmt = "%.4f" },
     { key = "DefaultCamZ", path = { "DefaultPosition", "z" }, kind = "number", default = 0, fmt = "%.4f" },
@@ -51,7 +68,7 @@ local SCHEMA = {
         kind = "number",
         default = 0,
         fmt = "%.4f",
-        section = "; --- COMBAT CAMERA OFFSETS (weapons drawn, un-locked) ---",
+        section = banner("; COMBAT CAMERA OFFSETS (Un-locked Combat Engagement)"),
     },
     { key = "CombatCamY", path = { "CombatPosition", "y" }, kind = "number", default = 0, fmt = "%.4f" },
     { key = "CombatCamZ", path = { "CombatPosition", "z" }, kind = "number", default = 0, fmt = "%.4f" },
@@ -62,7 +79,7 @@ local SCHEMA = {
         kind = "number",
         default = 0,
         fmt = "%.4f",
-        section = "; --- LOCK-ON CAMERA OFFSETS (target tracking; keep Y at 0 for tight orbit) ---",
+        section = banner("; LOCK-ON CAMERA OFFSETS (Target Tracking Mode)"),
     },
     { key = "LockOnCamY", path = { "LockOnPosition", "y" }, kind = "number", default = 0, fmt = "%.4f" },
     { key = "LockOnCamZ", path = { "LockOnPosition", "z" }, kind = "number", default = 0, fmt = "%.4f" },
@@ -73,7 +90,22 @@ local SCHEMA = {
         kind = "number",
         default = 0,
         fmt = "%.1f",
-        section = "; --- LOCK-ON FRAMING BIASES (degrees) ---\n; Yaw shifts the target left/right on screen; Pitch tilts up/down.\n; Tip: LockOnCamX=60 + LockOnYawBias=5 gives an over-the-shoulder split framing.",
+        section = banner(
+            "; LOCK-ON CAMERA BIASES (Target Framing Rotation & Tilt)",
+            ";",
+            "; LockOnYawBias (Horizontal Framing):",
+            ";   Rotates the camera view horizontally around the target.",
+            ";   Positive (+) / [SHIFT + RIGHT ARROW] = Shifts enemy target RIGHT on screen (+1°)",
+            ";   Negative (-) / [SHIFT + LEFT ARROW]  = Shifts enemy target LEFT on screen (-1°)",
+            ";",
+            ";   COMPOSITION TIP: Combine LockOnCamX=60.0 with LockOnYawBias=5.0 to achieve",
+            ";   a gorgeous over-the-shoulder split framing (Character LEFT, Enemy RIGHT).",
+            ";",
+            "; LockOnPitchBias (Vertical Framing):",
+            ";   Tilts the camera view plane vertically.",
+            ";   Positive (+) / [SHIFT + UP ARROW]    = Tilts camera down / Shifts enemy target UP (+1°)",
+            ";   Negative (-) / [SHIFT + DOWN ARROW]  = Tilts camera up / Shifts enemy target DOWN (-1°)"
+        ),
     },
     { key = "LockOnPitchBias", path = { "LockOnPitchBias" }, kind = "number", default = 0, fmt = "%.1f" },
 
@@ -83,7 +115,7 @@ local SCHEMA = {
         kind = "number",
         default = 200,
         fmt = "%.4f",
-        section = "; --- IDLE CAMERA (standing still, out of combat) ---",
+        section = banner("; IDLE CAMERA OFFSETS (Standing still, out of combat)"),
     },
     { key = "IdleCamY", path = { "IdlePosition", "y" }, kind = "number", default = 0, fmt = "%.4f" },
     { key = "IdleCamZ", path = { "IdlePosition", "z" }, kind = "number", default = 0, fmt = "%.4f" },
@@ -94,7 +126,7 @@ local SCHEMA = {
         kind = "number",
         default = 200,
         fmt = "%.4f",
-        section = "; --- WALK CAMERA OFFSETS (cinematic slow walk) ---",
+        section = banner("; WALK CAMERA OFFSETS (Cinematic Slow Walk)"),
     },
     { key = "WalkCamY", path = { "WalkPosition", "y" }, kind = "number", default = 0, fmt = "%.4f" },
     { key = "WalkCamZ", path = { "WalkPosition", "z" }, kind = "number", default = 0, fmt = "%.4f" },
@@ -105,7 +137,7 @@ local SCHEMA = {
         kind = "number",
         default = 0,
         fmt = "%.4f",
-        section = "; --- SPRINT CAMERA OFFSETS (high-speed traversal) ---",
+        section = banner("; SPRINT CAMERA OFFSETS (High-Speed Traversal)"),
     },
     { key = "SprintCamY", path = { "SprintPosition", "y" }, kind = "number", default = 0, fmt = "%.4f" },
     { key = "SprintCamZ", path = { "SprintPosition", "z" }, kind = "number", default = 0, fmt = "%.4f" },
@@ -116,7 +148,13 @@ local SCHEMA = {
         kind = "number",
         default = 90,
         clamp = FOV_CLAMP,
-        section = "; --- FIELD OF VIEW (auto-clamped 30-120; TPSFOV is lower for ranged accuracy) ---",
+        section = banner(
+            "; FIELD OF VIEW (FOV Settings)",
+            ";",
+            "; Baseline vanilla FOV is typically around 70-75.",
+            "; Values automatically clamped in [30, 120] interval.",
+            "; TPSFOV = 3rd person Ranged mode. It's lower for higher accuracy while aiming..."
+        ),
     },
     { key = "CombatFOV", path = { "fovs", "combat" }, kind = "number", default = 90, clamp = FOV_CLAMP },
     { key = "LockOnFOV", path = { "fovs", "lockon" }, kind = "number", default = 90, clamp = FOV_CLAMP },
@@ -130,7 +168,7 @@ local SCHEMA = {
         path = { "FOVTransitionSteps" },
         kind = "number",
         default = 60,
-        section = "; FOV transition smoothness (higher = slower, more cinematic).",
+        section = "; FOV Transition Smoothness (Higher numbers = slower, more cinematic pacing)",
     },
     { key = "KeyFOVTransitionSteps", path = { "KeyFOVTransitionSteps" }, kind = "number", default = 20 },
     { key = "LockOnExitBlendTime", path = { "LockOnExitBlendTime" }, kind = "number", default = 0.16, floor = 0.02 },
@@ -140,7 +178,11 @@ local SCHEMA = {
         path = { "EnableIdleCamera" },
         kind = "bool",
         default = true,
-        section = "; --- FEATURE TOGGLES (false = fall back to vanilla camera for that state) ---",
+        section = banner(
+            "; FEATURE TOGGLES",
+            "; Set true to let this script control properties for that movement stance,",
+            "; or false to fall back entirely to vanilla camera rules for that specific state."
+        ),
     },
     { key = "EnableWalkingCamera", path = { "EnableWalkingCamera" }, kind = "bool", default = true },
     { key = "EnableSprintingCamera", path = { "EnableSprintingCamera" }, kind = "bool", default = true },
@@ -280,14 +322,19 @@ local HEADER = [[; =============================================================
 ;      Z = Up & Down / Height (+Up / -Down)
 ;
 ; GLOBAL CORE HOTKEYS:
-;   [F5] Decrease active FOV sharply (-25)   [F6] Decrease smoothly (-5)
-;   [F7] Increase smoothly (+5)              [F8] Live-reload this file
+;   [F5]                    = Decrease active FOV sharply (-25)
+;   [F6]                    = Decrease active FOV smoothly (-5)
+;   [F7]                    = Increase active FOV smoothly (+5)
+;   [F8]                    = Live Reload this CFG file
 ;
-; CONTEXT-AWARE POSITION HOTKEYS (affect your currently active in-game mode):
-;   [CTRL + UP/DOWN]  Move camera on X (+/-50)
-;   [ALT  + LEFT/RIGHT] Move on Y (+/-10)     [ALT + UP/DOWN] Move on Z (+/-10)
+; CONTEXT-AWARE POSITION HOTKEYS (Modifies your currently active in-game stance):
+;   [CTRL + UP/DOWN ARROW]  = Move active camera position on X Axis (+50 / -50 units)
+;   [ALT  + LEFT/RIGHT]     = Move active camera position on Y Axis (+10 / -10 units)
+;   [ALT  + UP/DOWN ARROW]  = Move active camera position on Z Axis (+10 / -10 units)
 ;
-; PRESET HOTKEYS:  [CTRL + 1..4] load preset    [ALT + 1..4] save preset
+; PRESET MANAGEMENT HOTKEYS:
+;   [CTRL + 1..4]           = Load Saved CFG Preset
+;   [ALT  + 1..4]           = Save Current CFG Preset to Slot
 ; =================================================================================
 ]]
 
