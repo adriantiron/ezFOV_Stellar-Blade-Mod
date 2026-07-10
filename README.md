@@ -78,7 +78,9 @@ ezFOV/                       repo root
 │     ├─ env.lua             host-boundary adapter (guarded game-thread calls, keybinds, hooks)
 │     ├─ logging.lua         component-scoped, throttled logging
 │     ├─ heartbeat.lua       periodic pulse driver
-│     └─ tests/sanity_test.lua  offline smoke / characterization tests
+│     └─ ...                 runtime mod scripts only
+├─ tests/
+│  └─ sanity_test.lua        offline smoke / characterization tests
 ├─ run-tests.cmd             offline test runner
 ├─ stylua.toml               formatter config
 ├─ selene.toml               linter config

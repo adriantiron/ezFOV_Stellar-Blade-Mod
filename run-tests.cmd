@@ -14,7 +14,7 @@ cd /d "%~dp0"
 set "LUA=%~1"
 if "%LUA%"=="" set "LUA=lua"
 
-"%LUA%" ezFOV\Scripts\tests\sanity_test.lua
+"%LUA%" tests\sanity_test.lua
 set "EXITCODE=%ERRORLEVEL%"
 
 REM Pause only when double-clicked (launched in its own window) so that runs

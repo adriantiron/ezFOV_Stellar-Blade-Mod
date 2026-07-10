@@ -125,7 +125,7 @@ local function run_tests()
         "./ezFOV/Scripts/stance.lua",
         "./ezFOV/Scripts/hooks.lua",
         "./ezFOV/Scripts/main.lua",
-        "./ezFOV/Scripts/tests/sanity_test.lua",
+        "./tests/sanity_test.lua",
     }
 
     for _, path in ipairs(script_files) do
