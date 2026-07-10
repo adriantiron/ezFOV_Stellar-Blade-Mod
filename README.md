@@ -13,6 +13,7 @@ config file is optional.
 - **Live reload** — press `F8` to apply `ezFOV.cfg` changes instantly, no restart.
 - **Presets** — four save/load slots for whole camera layouts.
 - **Context-aware hotkey tuning** — the FOV/position keys edit whichever profile is currently active, and changes are written back to `ezFOV.cfg` automatically.
+- **F8-only mode** — set `EnableTuningHotkeys=false` in `ezFOV.cfg` to register only the `F8` live-reload key, leaving every other hotkey free to avoid clashing with other mods.
 - **Optional camera-collision disable** for unobstructed cinematic framing.
 
 ## Requirements
@@ -44,6 +45,10 @@ The FOV and position keys act on the **currently active profile** and are saved 
 | `Alt` + `1`–`4` | Save current layout to preset slot |
 | `Ctrl` + `1`–`4` | Load & apply preset slot |
 
+> **Hotkey mode:** every key above **except `F8`** is gated by `EnableTuningHotkeys` in `ezFOV.cfg`.
+> Set it to `false` for an F8-only setup that won't clash with other mods' keybinds (applied on game
+> launch / script reload). `F8` live-reload is always available.
+
 > Note: the position axes differ between standard modes (X = depth/zoom, Y = lateral, Z = height) and lock-on
 > mode (rotation-corrected). See `ezFOV/ezFOV.cfg` for the full explanation.
 
@@ -51,6 +56,10 @@ The FOV and position keys act on the **currently active profile** and are saved 
 
 All options live in `ezFOV/ezFOV.cfg`, which is thoroughly commented — coordinate systems, every offset, the
 lock-on biases, feature toggles, and transition tuning. Edit it and press `F8` in-game to reload instantly.
+
+The `EnableTuningHotkeys` toggle at the top of the file is read once when the mod loads: leave it `true` for
+the full hotkey set, or set it `false` for F8-only mode. Changes to it take effect on the next game launch /
+script reload.
 
 ## Development
 
