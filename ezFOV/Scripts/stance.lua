@@ -20,9 +20,9 @@ local log = Logging.for_component("Stance")
 
 local _ready_warned = false
 
-function M.init(cameraMod, configMod)
-    Camera = cameraMod
-    Config = configMod
+function M.init(camera_mod, config_mod)
+    Camera = camera_mod
+    Config = config_mod
     _ready_warned = false
 end
 
@@ -213,11 +213,11 @@ local function apply_profile(profile, cfg)
     local slow_steps = 100
     local steps_override = nil
 
-    -- 1. Slow down transitions IF the target profile is a traversal or resting state
-    if profile == P.walk or profile == P.sprint or profile == P.idle then
-        steps_override = slow_steps
-    -- 2. Slow down transitions IF we are exiting a traversal or resting state back to default/combat
-    elseif profile == P.default and (prev == P.walk or prev == P.sprint or prev == P.idle) then
+    -- Slow the transition when entering a traversal/resting state, or when leaving one back to
+    -- default/combat, so those camera moves ease in gently instead of snapping.
+    local entering_traversal = profile == P.walk or profile == P.sprint or profile == P.idle
+    local leaving_traversal = profile == P.default and (prev == P.walk or prev == P.sprint or prev == P.idle)
+    if entering_traversal or leaving_traversal then
         steps_override = slow_steps
     end
 

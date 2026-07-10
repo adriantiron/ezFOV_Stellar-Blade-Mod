@@ -164,7 +164,7 @@ end)
 
 -- ==================== Helpers ====================
 
-local function ensure_lockon_enforcement(cfg)
+local function ensure_lockon_enforcement(current_cfg)
     if not Camera or not Camera.start_enforcement then
         log.error(
             "Unable to restart lock-on enforcement because the camera module is unavailable.",
@@ -172,7 +172,7 @@ local function ensure_lockon_enforcement(cfg)
         )
         return
     end
-    if not cfg or type(cfg) ~= "table" or not cfg.fovs then
+    if not current_cfg or type(current_cfg) ~= "table" or not current_cfg.fovs then
         log.error(
             "Unable to restart lock-on enforcement because the runtime config is invalid.",
             "enforcement_restart_missing_cfg"
@@ -183,14 +183,14 @@ local function ensure_lockon_enforcement(cfg)
     if Camera.is_enforcing() then
         return
     end
-    local fov = cfg.fovs.lockon or cfg.fovs.combat or cfg.fovs.fov
-    Camera.start_enforcement(cfg.LockOnPosition, fov)
+    local fov = current_cfg.fovs.lockon or current_cfg.fovs.combat or current_cfg.fovs.fov
+    Camera.start_enforcement(current_cfg.LockOnPosition, fov)
     log.debug("Restarted dead enforcement loop", "restart_enforcement")
 end
 
 local function adjust_current_fov(delta)
-    local cfg = Config.get()
-    if not cfg or type(cfg) ~= "table" or not cfg.fovs then
+    local current_cfg = Config.get()
+    if not current_cfg or type(current_cfg) ~= "table" or not current_cfg.fovs then
         log.error("FOV adjustment aborted because the runtime config is invalid.", "adjust_fov_missing_cfg")
         return
     end
@@ -198,27 +198,27 @@ local function adjust_current_fov(delta)
     local profile = Stance.get_current_profile()
     local fov_key = Profiles.fov_key_for_profile(profile)
 
-    cfg.fovs[fov_key] = Profiles.fov_for_profile(profile, cfg) + delta
+    current_cfg.fovs[fov_key] = Profiles.fov_for_profile(profile, current_cfg) + delta
 
-    for k, v in pairs(cfg.fovs) do
+    for k, v in pairs(current_cfg.fovs) do
         if type(v) == "number" then
             if v < Constants.FOV_MIN then
-                cfg.fovs[k] = Constants.FOV_MIN
+                current_cfg.fovs[k] = Constants.FOV_MIN
             end
             if v > Constants.FOV_MAX then
-                cfg.fovs[k] = Constants.FOV_MAX
+                current_cfg.fovs[k] = Constants.FOV_MAX
             end
         end
     end
 
-    local new_fov = cfg.fovs[fov_key]
+    local new_fov = current_cfg.fovs[fov_key]
 
     if profile == Profiles.PROFILES.lockon then
-        ensure_lockon_enforcement(cfg)
+        ensure_lockon_enforcement(current_cfg)
         Camera.update_enforcement_fov(new_fov)
     else
         Env.run_on_game_thread("adjust_fov", function()
-            Camera.set_fov_via_function(new_fov, cfg.KeyFOVTransitionSteps)
+            Camera.set_fov_via_function(new_fov, current_cfg.KeyFOVTransitionSteps)
         end)
     end
 
@@ -227,23 +227,23 @@ local function adjust_current_fov(delta)
 end
 
 local function adjust_current_position(axis, delta)
-    local cfg = Config.get()
-    if not cfg or type(cfg) ~= "table" then
+    local current_cfg = Config.get()
+    if not current_cfg or type(current_cfg) ~= "table" then
         log.error("Position adjustment aborted because the runtime config is invalid.", "adjust_position_missing_cfg")
         return
     end
 
     local profile = Stance.get_current_profile()
-    local pos = Profiles.position_for_profile(profile, cfg)
+    local pos = Profiles.position_for_profile(profile, current_cfg)
 
     pos[axis] = (pos[axis] or 0) + delta
 
     if profile == Profiles.PROFILES.lockon then
-        ensure_lockon_enforcement(cfg)
+        ensure_lockon_enforcement(current_cfg)
         Camera.update_enforcement_pos(pos)
     else
         Env.run_on_game_thread("adjust_position", function()
-            Camera.set_camera_relative_location(pos, cfg.KeyFOVTransitionSteps)
+            Camera.set_camera_relative_location(pos, current_cfg.KeyFOVTransitionSteps)
         end)
     end
 
@@ -252,37 +252,37 @@ local function adjust_current_position(axis, delta)
 end
 
 local function adjust_lockon_bias(field, delta)
-    local cfg = Config.get()
-    if not cfg or type(cfg) ~= "table" then
+    local current_cfg = Config.get()
+    if not current_cfg or type(current_cfg) ~= "table" then
         log.error("Lock-on bias adjustment aborted because the runtime config is invalid.", "adjust_bias_missing_cfg")
         return
     end
 
-    cfg[field] = (cfg[field] or 0) + delta
+    current_cfg[field] = (current_cfg[field] or 0) + delta
 
     -- Clamp to reasonable range
-    if cfg[field] > Constants.LOCKON_BIAS_LIMIT then
-        cfg[field] = Constants.LOCKON_BIAS_LIMIT
+    if current_cfg[field] > Constants.LOCKON_BIAS_LIMIT then
+        current_cfg[field] = Constants.LOCKON_BIAS_LIMIT
     end
-    if cfg[field] < -Constants.LOCKON_BIAS_LIMIT then
-        cfg[field] = -Constants.LOCKON_BIAS_LIMIT
+    if current_cfg[field] < -Constants.LOCKON_BIAS_LIMIT then
+        current_cfg[field] = -Constants.LOCKON_BIAS_LIMIT
     end
 
     if Camera.is_enforcing() then
         if field == "LockOnYawBias" then
-            Camera.update_enforcement_yaw_bias(cfg.LockOnYawBias)
+            Camera.update_enforcement_yaw_bias(current_cfg.LockOnYawBias)
         elseif field == "LockOnPitchBias" then
-            Camera.update_enforcement_pitch_bias(cfg.LockOnPitchBias)
+            Camera.update_enforcement_pitch_bias(current_cfg.LockOnPitchBias)
         end
     end
 
     Config.write()
-    log.debug(string.format("%s = %.1f", field, cfg[field]), "adjust_bias")
+    log.debug(string.format("%s = %.1f", field, current_cfg[field]), "adjust_bias")
 end
 
 local function apply_for_current_state()
-    local cfg = Config.get()
-    if not cfg or type(cfg) ~= "table" then
+    local current_cfg = Config.get()
+    if not current_cfg or type(current_cfg) ~= "table" then
         log.error("State application aborted because the runtime config is invalid.", "apply_state_missing_cfg")
         return
     end
@@ -293,32 +293,32 @@ local function apply_for_current_state()
         battle = (PlayerCtx.is_battle() == true),
         locomotion = PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state(),
     }
-    local profile = Profiles.resolve_profile(state, cfg, PlayerCtx.LOCO_STATES)
-    local fov = Profiles.fov_for_profile(profile, cfg)
-    local pos = Profiles.position_for_profile(profile, cfg)
+    local profile = Profiles.resolve_profile(state, current_cfg, PlayerCtx.LOCO_STATES)
+    local fov = Profiles.fov_for_profile(profile, current_cfg)
+    local pos = Profiles.position_for_profile(profile, current_cfg)
 
     if profile == Profiles.PROFILES.lockon then
-        Camera.start_enforcement(cfg.LockOnPosition, fov)
+        Camera.start_enforcement(current_cfg.LockOnPosition, fov)
     else
         local should_blend_lockon_exit = Camera.is_enforcing and Camera.is_enforcing()
         if should_blend_lockon_exit and Camera.begin_lockon_exit_blend then
-            local started = Camera.begin_lockon_exit_blend(pos, fov, nil, cfg.LockOnExitBlendTime)
+            local started = Camera.begin_lockon_exit_blend(pos, fov, nil, current_cfg.LockOnExitBlendTime)
             if not started then
                 if Camera.cancel_lockon_exit_blend then
                     Camera.cancel_lockon_exit_blend()
                 end
-                Camera.set_fov_via_function(fov, cfg.KeyFOVTransitionSteps)
-                Camera.set_camera_relative_location(pos, cfg.KeyFOVTransitionSteps)
+                Camera.set_fov_via_function(fov, current_cfg.KeyFOVTransitionSteps)
+                Camera.set_camera_relative_location(pos, current_cfg.KeyFOVTransitionSteps)
             end
         else
             if Camera.cancel_lockon_exit_blend then
                 Camera.cancel_lockon_exit_blend()
             end
-            Camera.set_fov_via_function(fov, cfg.KeyFOVTransitionSteps)
-            Camera.set_camera_relative_location(pos, cfg.KeyFOVTransitionSteps)
+            Camera.set_fov_via_function(fov, current_cfg.KeyFOVTransitionSteps)
+            Camera.set_camera_relative_location(pos, current_cfg.KeyFOVTransitionSteps)
         end
     end
-    Camera.disable_camera_collision(cfg.DisableCameraCollision)
+    Camera.disable_camera_collision(current_cfg.DisableCameraCollision)
 end
 
 -- ==================== Keybinds: FOV ====================

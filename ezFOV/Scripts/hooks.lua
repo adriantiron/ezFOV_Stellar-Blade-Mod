@@ -50,10 +50,10 @@ local function is_bootstrap_debug_enabled()
     if DEBUG_BOOTSTRAP_STATE_MACHINE == true then
         return true
     end
-    if not H.ConfigMod or type(H.ConfigMod.get) ~= "function" then
+    if not H.config_mod or type(H.config_mod.get) ~= "function" then
         return false
     end
-    local cfg = H.ConfigMod.get()
+    local cfg = H.config_mod.get()
     return cfg and cfg.DebugBootstrapStateMachine == true
 end
 
@@ -183,8 +183,8 @@ function H.init(Camera, Config)
         return
     end
 
-    H.Camera = Camera
-    H.ConfigMod = Config
+    H.camera = Camera
+    H.config_mod = Config
     reset_bootstrap()
 
     log.debug("Hooks init: clearing previously registered hooks", "hooks_init_clear_old")
@@ -222,11 +222,11 @@ function H.init(Camera, Config)
     H._hook_ids.client_restart = { path = "/Script/Engine.PlayerController:ClientRestart" }
     H._hook_ids.client_restart.pre_id, H._hook_ids.client_restart.post_id = safe_register_hook(
         H._hook_ids.client_restart.path,
-        function(self, NewPawn)
+        function(_self, _new_pawn)
             Env.run_now("client_restart_hook", function()
                 log.debug("ClientRestart: clearing caches and stopping enforcement", "client_restart")
-                if H.Camera and H.Camera.stop_enforcement then
-                    H.Camera.stop_enforcement()
+                if H.camera and H.camera.stop_enforcement then
+                    H.camera.stop_enforcement()
                 end
                 if PlayerCtx.clear_caches then
                     PlayerCtx.clear_caches()
@@ -254,7 +254,7 @@ function H.init(Camera, Config)
     H._hook_ids.blocking_mode = { path = "/Script/SB.SBCharacter:IsBlockingMode" }
     H._hook_ids.blocking_mode.pre_id, H._hook_ids.blocking_mode.post_id = safe_register_hook(
         H._hook_ids.blocking_mode.path,
-        function(self, result)
+        function(_self, _result)
             Env.run_now("isblockingmode_hook", function()
                 Heartbeat.pulse()
 
@@ -266,10 +266,10 @@ function H.init(Camera, Config)
                 if not Bootstrap.cold_applied and Bootstrap.state == BOOTSTRAP_IDLE then
                     if not PlayerCtx.camera_or_pc_invalid() then
                         local tps = PlayerCtx.is_tps_mode()
-                        local inBattle = PlayerCtx.is_battle()
+                        local in_battle = PlayerCtx.is_battle()
 
-                        if tps == false and inBattle == false then
-                            local cfg = H.ConfigMod.get()
+                        if tps == false and in_battle == false then
+                            local cfg = H.config_mod.get()
                             if not cfg or type(cfg) ~= "table" then
                                 log.error(
                                     "Cold apply skipped because the runtime config is invalid.",
@@ -281,9 +281,9 @@ function H.init(Camera, Config)
                             begin_cold_apply_bootstrap()
                             -- Only set _cold_applied if the camera is actually reachable
                             local cam_ok = Env.run_on_game_thread("cold_apply", function()
-                                H.Camera.set_fov_via_function(cfg.fovs.fov)
-                                H.Camera.set_camera_relative_location(cfg.DefaultPosition)
-                                H.Camera.disable_camera_collision(cfg.DisableCameraCollision)
+                                H.camera.set_fov_via_function(cfg.fovs.fov)
+                                H.camera.set_camera_relative_location(cfg.DefaultPosition)
+                                H.camera.disable_camera_collision(cfg.DisableCameraCollision)
 
                                 complete_cold_apply_bootstrap()
 

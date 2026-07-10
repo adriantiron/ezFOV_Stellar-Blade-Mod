@@ -257,7 +257,7 @@ end
 
 -- ==================== FOV transition ====================
 
-function M.set_fov_via_function(target_fov, overrideSteps)
+function M.set_fov_via_function(target_fov, override_steps)
     if PlayerCtx.camera_or_pc_invalid() then
         log.warn(
             "FOV transition aborted because the player camera context is unavailable.",
@@ -288,7 +288,7 @@ function M.set_fov_via_function(target_fov, overrideSteps)
     M._active_target_fov = target_fov
 
     local cfg_steps = (M._cfg and M._cfg.FOVTransitionSteps) or 20
-    local steps = overrideSteps or math_max(cfg_steps, 10)
+    local steps = override_steps or math_max(cfg_steps, 10)
     local step = 0
     ---@type any
     local cam_any = cam
@@ -331,7 +331,7 @@ end
 
 -- ==================== Camera position transition ====================
 
-function M.set_camera_relative_location(target_position, overrideSteps)
+function M.set_camera_relative_location(target_position, override_steps)
     if PlayerCtx.camera_or_pc_invalid() then
         log.warn(
             "Camera position transition aborted because the camera context is unavailable.",
@@ -385,7 +385,7 @@ function M.set_camera_relative_location(target_position, overrideSteps)
     end
 
     local cfg_steps = (M._cfg and M._cfg.FOVTransitionSteps) or 100
-    local steps_units = overrideSteps or math_max(cfg_steps, 10)
+    local steps_units = override_steps or math_max(cfg_steps, 10)
     local unit = (M._cfg and M._cfg.TransitionTimeUnit) or 3
     local duration_ms = math_max(steps_units * unit, 10)
 
@@ -399,7 +399,7 @@ function M.set_camera_relative_location(target_position, overrideSteps)
             M._active_duration_ms = duration_ms
             return
         end
-        _queued_transition = { pos = target_position, steps = overrideSteps }
+        _queued_transition = { pos = target_position, steps = override_steps }
         return
     end
 
@@ -712,7 +712,7 @@ function M.cancel_lockon_exit_blend()
     cancel_lockon_exit_blend()
 end
 
-function M.begin_lockon_exit_blend(target_position, target_fov, _overrideSteps, duration_override)
+function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps, duration_override)
     if PlayerCtx.camera_or_pc_invalid() then
         log.warn(
             "Lock-on exit blend skipped because the camera context is unavailable.",
