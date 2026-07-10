@@ -113,6 +113,7 @@ local function run_tests()
     local script_files = {
         "./ezFOV/Scripts/env.lua",
         "./ezFOV/Scripts/logging.lua",
+        "./ezFOV/Scripts/constants.lua",
         "./ezFOV/Scripts/heartbeat.lua",
         "./ezFOV/Scripts/playercontext.lua",
         "./ezFOV/Scripts/config.lua",
@@ -272,6 +273,21 @@ local function run_tests()
     assert(type(cfg.fovs.fov) == "number", "config fov should be numeric")
     assert(type(cfg.DefaultPosition) == "table", "config should include DefaultPosition")
     assert(type(cfg.DefaultPosition.x) == "number", "DefaultPosition.x should be numeric")
+
+    -- Constants module: cross-cutting tuning values used by main/playercontext.
+    local Constants = require("constants")
+    assert(
+        type(Constants.FOV_MIN) == "number" and type(Constants.FOV_MAX) == "number",
+        "constants should expose numeric FOV bounds"
+    )
+    assert(Constants.FOV_MAX > Constants.FOV_MIN, "FOV_MAX should exceed FOV_MIN")
+    assert(type(Constants.LOCKON_BIAS_LIMIT) == "number", "constants should expose LOCKON_BIAS_LIMIT")
+    assert(
+        type(Constants.LOCO_IDLE_MAX_SPEED) == "number"
+            and type(Constants.LOCO_SLOW_WALK_MAX_SPEED) == "number"
+            and type(Constants.LOCO_SPRINT_MIN_SPEED) == "number",
+        "constants should expose numeric locomotion thresholds"
+    )
 end
 
 local function format_error(err)

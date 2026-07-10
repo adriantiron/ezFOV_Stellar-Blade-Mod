@@ -5,6 +5,7 @@ local PlayerCtx = require("playercontext")
 local Hooks = require("hooks")
 local Stance = require("stance")
 local Logging = require("logging")
+local Constants = require("constants")
 
 -- Component-scoped logger (see Logging.for_component). warn is unused in this module.
 local log = Logging.for_component("Main")
@@ -225,11 +226,11 @@ local function adjust_current_fov(delta)
 
     for k, v in pairs(cfg.fovs) do
         if type(v) == "number" then
-            if v < 30 then
-                cfg.fovs[k] = 30
+            if v < Constants.FOV_MIN then
+                cfg.fovs[k] = Constants.FOV_MIN
             end
-            if v > 120 then
-                cfg.fovs[k] = 120
+            if v > Constants.FOV_MAX then
+                cfg.fovs[k] = Constants.FOV_MAX
             end
         end
     end
@@ -313,11 +314,11 @@ local function adjust_lockon_bias(field, delta)
     cfg[field] = (cfg[field] or 0) + delta
 
     -- Clamp to reasonable range
-    if cfg[field] > 30 then
-        cfg[field] = 30
+    if cfg[field] > Constants.LOCKON_BIAS_LIMIT then
+        cfg[field] = Constants.LOCKON_BIAS_LIMIT
     end
-    if cfg[field] < -30 then
-        cfg[field] = -30
+    if cfg[field] < -Constants.LOCKON_BIAS_LIMIT then
+        cfg[field] = -Constants.LOCKON_BIAS_LIMIT
     end
 
     if Camera.is_enforcing() then

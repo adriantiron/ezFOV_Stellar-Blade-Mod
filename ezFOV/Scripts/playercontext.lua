@@ -1,5 +1,6 @@
 local Heartbeat = require("heartbeat")
 local Logging = require("logging")
+local Constants = require("constants")
 
 local math_sqrt = math.sqrt
 
@@ -471,11 +472,11 @@ function PlayerCtx.get_locomotion_state()
     local speed2D = math_sqrt(x * x + y * y)
 
     local new_state
-    if speed2D < 120 then
+    if speed2D < Constants.LOCO_IDLE_MAX_SPEED then
         new_state = PlayerCtx.LOCO_STATES.idle
-    elseif speed2D < 240 then
+    elseif speed2D < Constants.LOCO_SLOW_WALK_MAX_SPEED then
         new_state = PlayerCtx.LOCO_STATES.slow_walk
-    elseif speed2D > 550 then
+    elseif speed2D > Constants.LOCO_SPRINT_MIN_SPEED then
         new_state = PlayerCtx.LOCO_STATES.sprint
     else
         new_state = PlayerCtx.LOCO_STATES.walk
