@@ -114,6 +114,7 @@ local function run_tests()
         "./ezFOV/Scripts/env.lua",
         "./ezFOV/Scripts/logging.lua",
         "./ezFOV/Scripts/constants.lua",
+        "./ezFOV/Scripts/profiles.lua",
         "./ezFOV/Scripts/heartbeat.lua",
         "./ezFOV/Scripts/playercontext.lua",
         "./ezFOV/Scripts/config.lua",
@@ -333,7 +334,10 @@ local function run_tests()
         os.remove(rt.path)
         assert(wf ~= nil, "Config.write should produce the config file")
         assert(written:find("FOV=85", 1, true) ~= nil, "written cfg should contain FOV=85")
-        assert(written:find("DisableCameraCollision=true", 1, true) ~= nil, "written cfg should contain the collision flag")
+        assert(
+            written:find("DisableCameraCollision=true", 1, true) ~= nil,
+            "written cfg should contain the collision flag"
+        )
         assert(written:find("DefaultCamX=10.0000", 1, true) ~= nil, "written cfg should contain DefaultCamX=10.0000")
         assert(written:find("LockOnYawBias=5.0", 1, true) ~= nil, "written cfg should contain LockOnYawBias=5.0")
 
@@ -353,12 +357,24 @@ local function run_tests()
         assert(rt.fovs.idle == 88, "idle fov should round-trip")
         assert(rt.fovs.walk == 92, "walk fov should round-trip")
         assert(rt.fovs.sprint == 100, "sprint fov should round-trip")
-        assert(rt.DefaultPosition.x == 10 and rt.DefaultPosition.y == 20 and rt.DefaultPosition.z == 30, "default pos round-trip")
-        assert(rt.CombatPosition.x == 40 and rt.CombatPosition.y == 50 and rt.CombatPosition.z == 60, "combat pos round-trip")
-        assert(rt.LockOnPosition.x == 70 and rt.LockOnPosition.y == 0 and rt.LockOnPosition.z == 15, "lockon pos round-trip")
+        assert(
+            rt.DefaultPosition.x == 10 and rt.DefaultPosition.y == 20 and rt.DefaultPosition.z == 30,
+            "default pos round-trip"
+        )
+        assert(
+            rt.CombatPosition.x == 40 and rt.CombatPosition.y == 50 and rt.CombatPosition.z == 60,
+            "combat pos round-trip"
+        )
+        assert(
+            rt.LockOnPosition.x == 70 and rt.LockOnPosition.y == 0 and rt.LockOnPosition.z == 15,
+            "lockon pos round-trip"
+        )
         assert(rt.IdlePosition.x == 200 and rt.IdlePosition.y == 5 and rt.IdlePosition.z == 10, "idle pos round-trip")
         assert(rt.WalkPosition.x == 210 and rt.WalkPosition.y == 6 and rt.WalkPosition.z == 11, "walk pos round-trip")
-        assert(rt.SprintPosition.x == 220 and rt.SprintPosition.y == 7 and rt.SprintPosition.z == 12, "sprint pos round-trip")
+        assert(
+            rt.SprintPosition.x == 220 and rt.SprintPosition.y == 7 and rt.SprintPosition.z == 12,
+            "sprint pos round-trip"
+        )
         assert(rt.LockOnYawBias == 5.0, "yaw bias should round-trip")
         assert(rt.LockOnPitchBias == -3.0, "pitch bias should round-trip")
         assert(rt.FOVTransitionSteps == 40, "fov transition steps should round-trip")
@@ -393,6 +409,90 @@ local function run_tests()
         assert(rt.LockOnExitBlendTime >= 0.02, "blend time should be floored at 0.02 on load")
         rt.path = original_path
         Config.reload()
+    end
+
+    -- Profiles: pure state->profile and profile->fov/position resolution (the single source
+    -- shared by stance.lua and main.lua). Pure functions, so no host stubs are required.
+    do
+        local Profiles = require("profiles")
+        local P = Profiles.PROFILES
+        local LOCO = { idle = "idle", slow_walk = "slow_walk", walk = "walk", sprint = "sprint" }
+        local pcfg = {
+            fovs = { fov = 90, combat = 80, tps = 70, lockon = 75, idle = 60, walk = 65, sprint = 100 },
+            DefaultPosition = {},
+            CombatPosition = {},
+            LockOnPosition = {},
+            IdlePosition = {},
+            WalkPosition = {},
+            SprintPosition = {},
+            EnableLockOnCamera = true,
+            EnableIdleCamera = true,
+            EnableWalkingCamera = true,
+            EnableSprintingCamera = true,
+        }
+
+        -- resolve_profile priority: tps > lock-on > battle > sprint/idle/slow_walk > default
+        assert(Profiles.resolve_profile({ tps = true, lockon = true, battle = true }, pcfg, LOCO) == P.tps, "tps wins")
+        assert(
+            Profiles.resolve_profile({ lockon = true, battle = true }, pcfg, LOCO) == P.lockon,
+            "lock-on over battle"
+        )
+        assert(
+            Profiles.resolve_profile({ battle = true, locomotion = LOCO.sprint }, pcfg, LOCO) == P.battle,
+            "battle over locomotion"
+        )
+        assert(Profiles.resolve_profile({ locomotion = LOCO.sprint }, pcfg, LOCO) == P.sprint, "sprint locomotion")
+        assert(Profiles.resolve_profile({ locomotion = LOCO.idle }, pcfg, LOCO) == P.idle, "idle locomotion")
+        assert(Profiles.resolve_profile({ locomotion = LOCO.slow_walk }, pcfg, LOCO) == P.walk, "slow_walk -> walk")
+        assert(Profiles.resolve_profile({ locomotion = LOCO.walk }, pcfg, LOCO) == P.default, "plain walk -> default")
+        assert(Profiles.resolve_profile({}, pcfg, LOCO) == P.default, "empty state -> default")
+
+        -- Enable* toggles gate the optional profiles; battle and tps are never gated.
+        local gated = {
+            fovs = pcfg.fovs,
+            EnableLockOnCamera = false,
+            EnableIdleCamera = false,
+            EnableWalkingCamera = false,
+            EnableSprintingCamera = false,
+        }
+        assert(Profiles.resolve_profile({ lockon = true }, gated, LOCO) == P.default, "lock-on gated off -> default")
+        assert(
+            Profiles.resolve_profile({ locomotion = LOCO.sprint }, gated, LOCO) == P.default,
+            "sprint gated off -> default"
+        )
+        assert(Profiles.resolve_profile({ battle = true }, gated, LOCO) == P.battle, "battle is never gated")
+
+        -- fov_for_profile
+        assert(Profiles.fov_for_profile(P.tps, pcfg) == 70, "tps fov")
+        assert(Profiles.fov_for_profile(P.lockon, pcfg) == 75, "lock-on fov")
+        assert(Profiles.fov_for_profile(P.battle, pcfg) == 80, "battle fov")
+        assert(Profiles.fov_for_profile(P.idle, pcfg) == 60, "idle fov")
+        assert(Profiles.fov_for_profile(P.walk, pcfg) == 65, "walk fov")
+        assert(Profiles.fov_for_profile(P.sprint, pcfg) == 100, "sprint fov")
+        assert(Profiles.fov_for_profile(P.default, pcfg) == 90, "default fov")
+
+        -- fov falls back to the base FOV when a profile-specific value is absent.
+        local base_only = { fovs = { fov = 88 } }
+        assert(Profiles.fov_for_profile(P.tps, base_only) == 88, "tps falls back to base fov")
+        assert(Profiles.fov_for_profile(P.lockon, base_only) == 88, "lock-on falls back to base fov")
+
+        -- position_for_profile (compared by table identity)
+        assert(Profiles.position_for_profile(P.lockon, pcfg) == pcfg.LockOnPosition, "lock-on pos")
+        assert(Profiles.position_for_profile(P.battle, pcfg) == pcfg.CombatPosition, "battle pos")
+        assert(Profiles.position_for_profile(P.idle, pcfg) == pcfg.IdlePosition, "idle pos")
+        assert(Profiles.position_for_profile(P.walk, pcfg) == pcfg.WalkPosition, "walk pos")
+        assert(Profiles.position_for_profile(P.sprint, pcfg) == pcfg.SprintPosition, "sprint pos")
+        assert(Profiles.position_for_profile(P.tps, pcfg) == pcfg.DefaultPosition, "tps pos -> default")
+        assert(Profiles.position_for_profile(P.default, pcfg) == pcfg.DefaultPosition, "default pos")
+
+        -- fov_key_for_profile: which cfg.fovs field a profile writes to.
+        assert(Profiles.fov_key_for_profile(P.tps) == "tps", "tps fov key")
+        assert(Profiles.fov_key_for_profile(P.lockon) == "lockon", "lock-on fov key")
+        assert(Profiles.fov_key_for_profile(P.battle) == "combat", "battle fov key -> combat")
+        assert(Profiles.fov_key_for_profile(P.idle) == "idle", "idle fov key")
+        assert(Profiles.fov_key_for_profile(P.walk) == "walk", "walk fov key")
+        assert(Profiles.fov_key_for_profile(P.sprint) == "sprint", "sprint fov key")
+        assert(Profiles.fov_key_for_profile(P.default) == "fov", "default fov key -> fov")
     end
 end
 

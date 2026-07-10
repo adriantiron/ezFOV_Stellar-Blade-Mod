@@ -6,6 +6,7 @@ local Hooks = require("hooks")
 local Stance = require("stance")
 local Logging = require("logging")
 local Constants = require("constants")
+local Profiles = require("profiles")
 
 -- Component-scoped logger (see Logging.for_component). warn is unused in this module.
 local log = Logging.for_component("Main")
@@ -109,29 +110,17 @@ Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
     Camera.init(cfg) -- Keep camera's internal reference perfectly synchronized
 
     Env.run_on_game_thread("reload_config_apply", function()
-        local isTPS = (PlayerCtx.is_tps_mode() == true)
-        local isLockOn = (PlayerCtx.is_lock_on() == true)
-        local isBattle = (PlayerCtx.is_battle() == true)
+        local state = {
+            tps = (PlayerCtx.is_tps_mode() == true),
+            lockon = (PlayerCtx.is_lock_on() == true),
+            battle = (PlayerCtx.is_battle() == true),
+            locomotion = PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state(),
+        }
+        local profile = Profiles.resolve_profile(state, cfg, PlayerCtx.LOCO_STATES)
+        local fov = Profiles.fov_for_profile(profile, cfg)
+        local pos = Profiles.position_for_profile(profile, cfg)
 
-        -- Fetch the live locomotion state
-        local locoState = PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state()
-
-        local fov = (isTPS and (cfg.fovs.tps or cfg.fovs.fov))
-            or (isLockOn and cfg.EnableLockOnCamera and (cfg.fovs.lockon or cfg.fovs.combat))
-            or (isBattle and cfg.fovs.combat)
-            or (locoState == PlayerCtx.LOCO_STATES.idle and cfg.EnableIdleCamera and cfg.fovs.idle)
-            or (locoState == PlayerCtx.LOCO_STATES.slow_walk and cfg.EnableWalkingCamera and cfg.fovs.walk)
-            or (locoState == PlayerCtx.LOCO_STATES.sprint and cfg.EnableSprintingCamera and cfg.fovs.sprint)
-            or cfg.fovs.fov
-
-        local pos = (isLockOn and cfg.EnableLockOnCamera and cfg.LockOnPosition)
-            or (isBattle and cfg.CombatPosition)
-            or (locoState == PlayerCtx.LOCO_STATES.idle and cfg.EnableIdleCamera and cfg.IdlePosition)
-            or (locoState == PlayerCtx.LOCO_STATES.slow_walk and cfg.EnableWalkingCamera and cfg.WalkPosition)
-            or (locoState == PlayerCtx.LOCO_STATES.sprint and cfg.EnableSprintingCamera and cfg.SprintPosition)
-            or cfg.DefaultPosition
-
-        if isLockOn and cfg.EnableLockOnCamera then
+        if profile == Profiles.PROFILES.lockon then
             Camera.start_enforcement(cfg.LockOnPosition, fov)
         else
             local should_blend_lockon_exit = Camera.is_enforcing and Camera.is_enforcing()
@@ -158,9 +147,9 @@ Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
         log.debug(
             string.format(
                 "Reloaded. TPS=%s Lock=%s Battle=%s FOV=%.0f Pos=(%.0f,%.0f,%.0f) YawBias=%.1f PitchBias=%.1f",
-                tostring(isTPS),
-                tostring(isLockOn),
-                tostring(isBattle),
+                tostring(state.tps),
+                tostring(state.lockon),
+                tostring(state.battle),
                 fov,
                 pos.x,
                 pos.y,
@@ -207,22 +196,9 @@ local function adjust_current_fov(delta)
     end
 
     local profile = Stance.get_current_profile()
+    local fov_key = Profiles.fov_key_for_profile(profile)
 
-    if profile == Stance.PROFILES.tps then
-        cfg.fovs.tps = (cfg.fovs.tps or cfg.fovs.fov) + delta
-    elseif profile == Stance.PROFILES.lockon then
-        cfg.fovs.lockon = (cfg.fovs.lockon or cfg.fovs.combat or cfg.fovs.fov) + delta
-    elseif profile == Stance.PROFILES.battle then
-        cfg.fovs.combat = (cfg.fovs.combat or cfg.fovs.fov) + delta -- Defensive fallback added
-    elseif profile == Stance.PROFILES.idle then
-        cfg.fovs.idle = (cfg.fovs.idle or cfg.fovs.fov) + delta
-    elseif profile == Stance.PROFILES.walk then
-        cfg.fovs.walk = (cfg.fovs.walk or cfg.fovs.fov) + delta
-    elseif profile == Stance.PROFILES.sprint then
-        cfg.fovs.sprint = (cfg.fovs.sprint or cfg.fovs.fov) + delta
-    else
-        cfg.fovs.fov = cfg.fovs.fov + delta
-    end
+    cfg.fovs[fov_key] = Profiles.fov_for_profile(profile, cfg) + delta
 
     for k, v in pairs(cfg.fovs) do
         if type(v) == "number" then
@@ -235,24 +211,9 @@ local function adjust_current_fov(delta)
         end
     end
 
-    local new_fov
-    if profile == Stance.PROFILES.tps then
-        new_fov = cfg.fovs.tps
-    elseif profile == Stance.PROFILES.lockon then
-        new_fov = cfg.fovs.lockon
-    elseif profile == Stance.PROFILES.battle then
-        new_fov = cfg.fovs.combat
-    elseif profile == Stance.PROFILES.idle then
-        new_fov = cfg.fovs.idle
-    elseif profile == Stance.PROFILES.walk then
-        new_fov = cfg.fovs.walk
-    elseif profile == Stance.PROFILES.sprint then
-        new_fov = cfg.fovs.sprint
-    else
-        new_fov = cfg.fovs.fov
-    end
+    local new_fov = cfg.fovs[fov_key]
 
-    if profile == Stance.PROFILES.lockon then
+    if profile == Profiles.PROFILES.lockon then
         ensure_lockon_enforcement(cfg)
         Camera.update_enforcement_fov(new_fov)
     else
@@ -273,25 +234,11 @@ local function adjust_current_position(axis, delta)
     end
 
     local profile = Stance.get_current_profile()
-
-    local pos
-    if profile == Stance.PROFILES.lockon then
-        pos = cfg.LockOnPosition
-    elseif profile == Stance.PROFILES.battle then
-        pos = cfg.CombatPosition
-    elseif profile == Stance.PROFILES.idle then
-        pos = cfg.IdlePosition
-    elseif profile == Stance.PROFILES.walk then
-        pos = cfg.WalkPosition
-    elseif profile == Stance.PROFILES.sprint then
-        pos = cfg.SprintPosition
-    else
-        pos = cfg.DefaultPosition
-    end
+    local pos = Profiles.position_for_profile(profile, cfg)
 
     pos[axis] = (pos[axis] or 0) + delta
 
-    if profile == Stance.PROFILES.lockon then
+    if profile == Profiles.PROFILES.lockon then
         ensure_lockon_enforcement(cfg)
         Camera.update_enforcement_pos(pos)
     else
@@ -340,34 +287,17 @@ local function apply_for_current_state()
         return
     end
 
-    local isTPS = (PlayerCtx.is_tps_mode() == true)
-    local isLockOn = (PlayerCtx.is_lock_on() == true)
-    local isBattle = (PlayerCtx.is_battle() == true)
-    local loco = PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state()
+    local state = {
+        tps = (PlayerCtx.is_tps_mode() == true),
+        lockon = (PlayerCtx.is_lock_on() == true),
+        battle = (PlayerCtx.is_battle() == true),
+        locomotion = PlayerCtx.get_locomotion_state and PlayerCtx.get_locomotion_state(),
+    }
+    local profile = Profiles.resolve_profile(state, cfg, PlayerCtx.LOCO_STATES)
+    local fov = Profiles.fov_for_profile(profile, cfg)
+    local pos = Profiles.position_for_profile(profile, cfg)
 
-    local fov = cfg.fovs.fov
-    local pos = cfg.DefaultPosition
-
-    if isTPS then
-        fov = cfg.fovs.tps or cfg.fovs.fov
-    elseif isLockOn and cfg.EnableLockOnCamera then
-        fov = cfg.fovs.lockon or cfg.fovs.combat or cfg.fovs.fov
-        pos = cfg.LockOnPosition
-    elseif isBattle then
-        fov = cfg.fovs.combat
-        pos = cfg.CombatPosition
-    elseif loco == PlayerCtx.LOCO_STATES.sprint and cfg.EnableSprintingCamera then
-        fov = cfg.fovs.sprint or cfg.fovs.fov
-        pos = cfg.SprintPosition
-    elseif loco == PlayerCtx.LOCO_STATES.idle and cfg.EnableIdleCamera then
-        fov = cfg.fovs.idle or cfg.fovs.fov
-        pos = cfg.IdlePosition
-    elseif loco == PlayerCtx.LOCO_STATES.slow_walk and cfg.EnableWalkingCamera then
-        fov = cfg.fovs.walk or cfg.fovs.fov
-        pos = cfg.WalkPosition
-    end
-
-    if isLockOn and cfg.EnableLockOnCamera then
+    if profile == Profiles.PROFILES.lockon then
         Camera.start_enforcement(cfg.LockOnPosition, fov)
     else
         local should_blend_lockon_exit = Camera.is_enforcing and Camera.is_enforcing()

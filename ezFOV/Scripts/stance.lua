@@ -1,23 +1,16 @@
 local PlayerCtx = require("playercontext")
 local Env = require("env").bind("Stance")
 local Logging = require("logging")
+local Profiles = require("profiles")
 
 local math_abs = math.abs
+local P = Profiles.PROFILES
 
 local M = {
     _last_tick = 0.0,
     _min_dt = 0.10,
     _applied_profile = nil,
     _applied_fov = nil,
-    PROFILES = {
-        default = "default",
-        tps = "tps",
-        lockon = "lockon",
-        battle = "battle",
-        idle = "idle",
-        walk = "walk",
-        sprint = "sprint",
-    },
 }
 
 local Camera, Config
@@ -65,12 +58,19 @@ local function ready()
     return true
 end
 
+-- choose_profile wraps the pure Profiles.resolve_profile with the two things that resolver
+-- cannot own: the runtime-config error log, and the stateful lock-on grace period (a brief
+-- window after lock-on releases during which we keep the lock-on profile so a momentary
+-- target toggle does not snap the camera).
 local function choose_profile(state, cfg)
-    if not state or type(state) ~= "table" then
-        return M.PROFILES.default
+    if type(state) ~= "table" then
+        return P.default
     end
+
+    -- TPS overrides everything and short-circuits before the config check (matches
+    -- resolve_profile's top priority) so it still resolves if the config briefly goes invalid.
     if state.tps == true then
-        return M.PROFILES.tps
+        return P.tps
     end
 
     local current_cfg = cfg or (Config and Config.get())
@@ -79,16 +79,18 @@ local function choose_profile(state, cfg)
             "Profile selection aborted because the runtime config is invalid.",
             "stance_choose_profile_missing_cfg"
         )
-        return M.PROFILES.default
+        return P.default
     end
 
+    -- Fresh lock-on: (re)arm the grace timer and take the lock-on profile.
     if state.lockon == true and current_cfg.EnableLockOnCamera then
         _lockon_last_true = os.clock()
         _grace_logged = false
-        return M.PROFILES.lockon
+        return P.lockon
     end
 
-    if M._applied_profile == M.PROFILES.lockon and current_cfg.EnableLockOnCamera then
+    -- Lock-on just released: hold the lock-on profile until the grace window elapses.
+    if M._applied_profile == P.lockon and current_cfg.EnableLockOnCamera then
         local since_last = os.clock() - _lockon_last_true
         if since_last < _LOCKON_EXIT_GRACE then
             if not _grace_logged then
@@ -102,46 +104,13 @@ local function choose_profile(state, cfg)
                     true
                 )
             end
-            return M.PROFILES.lockon
+            return P.lockon
         end
         log.debug("Lock-on grace period expired, exiting lock-on", "lockon_grace_expired", true)
     end
 
-    if state.battle == true then
-        return M.PROFILES.battle
-    end
-    if state.locomotion == PlayerCtx.LOCO_STATES.sprint and current_cfg.EnableSprintingCamera then
-        return M.PROFILES.sprint
-    end
-    if state.locomotion == PlayerCtx.LOCO_STATES.idle and current_cfg.EnableIdleCamera then
-        return M.PROFILES.idle
-    end
-    if state.locomotion == PlayerCtx.LOCO_STATES.slow_walk and current_cfg.EnableWalkingCamera then
-        return M.PROFILES.walk
-    end
-    return M.PROFILES.default
-end
-
-local function fov_for_profile(profile, cfg)
-    if profile == M.PROFILES.tps then
-        return cfg.fovs.tps or cfg.fovs.fov
-    end
-    if profile == M.PROFILES.lockon then
-        return cfg.fovs.lockon or cfg.fovs.combat or cfg.fovs.fov
-    end
-    if profile == M.PROFILES.battle then
-        return cfg.fovs.combat or cfg.fovs.fov
-    end
-    if profile == M.PROFILES.idle then
-        return cfg.fovs.idle or cfg.fovs.fov
-    end
-    if profile == M.PROFILES.walk then
-        return cfg.fovs.walk or cfg.fovs.fov
-    end
-    if profile == M.PROFILES.sprint then
-        return cfg.fovs.sprint or cfg.fovs.fov
-    end
-    return cfg.fovs.fov
+    -- No lock-on override active: defer to the pure resolver for battle / locomotion / default.
+    return Profiles.resolve_profile(state, current_cfg, PlayerCtx.LOCO_STATES)
 end
 
 local function apply_fov_transition(target_fov, steps_override)
@@ -172,22 +141,12 @@ local function apply_fov_transition(target_fov, steps_override)
 end
 
 local function apply_position_for_profile(profile, cfg, steps_override)
-    if profile == M.PROFILES.lockon or profile == M.PROFILES.tps then
+    -- Lock-on is driven by the enforcement loop and tps keeps its position; neither uses this path.
+    if profile == P.lockon or profile == P.tps then
         return
     end
 
-    local pos = nil
-    if profile == M.PROFILES.battle then
-        pos = cfg.CombatPosition
-    elseif profile == M.PROFILES.sprint then
-        pos = cfg.SprintPosition
-    elseif profile == M.PROFILES.idle then
-        pos = cfg.IdlePosition
-    elseif profile == M.PROFILES.walk then
-        pos = cfg.WalkPosition
-    elseif profile == M.PROFILES.default then
-        pos = cfg.DefaultPosition
-    end
+    local pos = Profiles.position_for_profile(profile, cfg)
 
     if pos then
         if not Camera or not Camera.set_camera_relative_location then
@@ -213,7 +172,7 @@ local function apply_lockon_profile(cfg)
         return
     end
 
-    local fov = fov_for_profile(M.PROFILES.lockon, cfg)
+    local fov = Profiles.fov_for_profile(P.lockon, cfg)
     M._applied_fov = fov
 
     if Camera.is_enforcing and Camera.is_enforcing() then
@@ -237,7 +196,7 @@ end
 
 local function apply_profile(profile, cfg)
     if profile == M._applied_profile then
-        if profile == M.PROFILES.lockon then
+        if profile == P.lockon then
             apply_lockon_profile(cfg)
         end
         return
@@ -246,7 +205,7 @@ local function apply_profile(profile, cfg)
     local prev = M._applied_profile
     M._applied_profile = profile
 
-    if profile == M.PROFILES.lockon then
+    if profile == P.lockon then
         apply_lockon_profile(cfg)
         return
     end
@@ -255,28 +214,25 @@ local function apply_profile(profile, cfg)
     local steps_override = nil
 
     -- 1. Slow down transitions IF the target profile is a traversal or resting state
-    if profile == M.PROFILES.walk or profile == M.PROFILES.sprint or profile == M.PROFILES.idle then
+    if profile == P.walk or profile == P.sprint or profile == P.idle then
         steps_override = slow_steps
     -- 2. Slow down transitions IF we are exiting a traversal or resting state back to default/combat
-    elseif
-        profile == M.PROFILES.default
-        and (prev == M.PROFILES.walk or prev == M.PROFILES.sprint or prev == M.PROFILES.idle)
-    then
+    elseif profile == P.default and (prev == P.walk or prev == P.sprint or prev == P.idle) then
         steps_override = slow_steps
     end
 
-    if prev == M.PROFILES.lockon and Camera and Camera.begin_lockon_exit_blend then
-        local target_fov = fov_for_profile(profile, cfg)
+    if prev == P.lockon and Camera and Camera.begin_lockon_exit_blend then
+        local target_fov = Profiles.fov_for_profile(profile, cfg)
         local target_pos = nil
-        if profile == M.PROFILES.battle then
+        if profile == P.battle then
             target_pos = cfg.CombatPosition
-        elseif profile == M.PROFILES.sprint then
+        elseif profile == P.sprint then
             target_pos = cfg.SprintPosition
-        elseif profile == M.PROFILES.idle then
+        elseif profile == P.idle then
             target_pos = cfg.IdlePosition
-        elseif profile == M.PROFILES.walk then
+        elseif profile == P.walk then
             target_pos = cfg.WalkPosition
-        elseif profile == M.PROFILES.default then
+        elseif profile == P.default then
             target_pos = cfg.DefaultPosition
         end
 
@@ -300,11 +256,11 @@ local function apply_profile(profile, cfg)
     end
 
     apply_position_for_profile(profile, cfg, steps_override)
-    apply_fov_transition(fov_for_profile(profile, cfg), steps_override)
+    apply_fov_transition(Profiles.fov_for_profile(profile, cfg), steps_override)
 end
 
 function M.get_current_profile()
-    return M._applied_profile or M.PROFILES.default
+    return M._applied_profile or P.default
 end
 
 function M.reset_state()
@@ -351,7 +307,7 @@ function M.pulse()
 
     apply_profile(profile, cfg)
 
-    if M._applied_profile == M.PROFILES.lockon then
+    if M._applied_profile == P.lockon then
         return
     end
 
@@ -377,7 +333,7 @@ function M.pulse()
     if not transitioning then
         local target_or_err = nil
         local ok_target = Env.run_now("pulse_post_target_fov_eval", function()
-            target_or_err = fov_for_profile(M._applied_profile, cfg)
+            target_or_err = Profiles.fov_for_profile(M._applied_profile, cfg)
         end)
         if not ok_target then
             return
