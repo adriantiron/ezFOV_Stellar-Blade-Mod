@@ -40,6 +40,22 @@ end
 
 local SCHEMA = {
     {
+        key = "EnableTuningHotkeys",
+        path = { "EnableTuningHotkeys" },
+        kind = "bool",
+        default = true,
+        section = banner(
+            "; HOTKEY MODE",
+            "; Selects which keybinds are registered when the mod loads:",
+            ";   true  = Full control. Registers every hotkey listed in the header",
+            ";           (FOV, position, lock-on bias, and preset keys) plus [F8].",
+            ";   false = F8-only. Registers ONLY the [F8] live-reload key and leaves",
+            ";           all other keys untouched, to avoid clashing with other mods.",
+            "; Applied once at load, so changes take effect on game launch / script reload."
+        ),
+    },
+
+    {
         key = "DisableCameraCollision",
         path = { "DisableCameraCollision" },
         kind = "bool",
@@ -180,7 +196,7 @@ local SCHEMA = {
         default = true,
         section = banner(
             "; FEATURE TOGGLES",
-            "; Set true to let this script control properties for that movement stance,",
+            "; Set to true to let this script control properties for that movement stance,",
             "; or false to fall back entirely to vanilla camera rules for that specific state."
         ),
     },
@@ -322,6 +338,8 @@ local HEADER = [[; =============================================================
 ;      Z = Up & Down / Height (+Up / -Down)
 ;
 ; GLOBAL CORE HOTKEYS:
+;   NOTE: Every hotkey below EXCEPT [F8] is gated by EnableTuningHotkeys (see HOTKEY
+;         MODE). Set it to false for an F8-only setup that won't clash with other mods.
 ;   [F5]                    = Decrease active FOV sharply (-25)
 ;   [F6]                    = Decrease active FOV smoothly (-5)
 ;   [F7]                    = Increase active FOV smoothly (+5)

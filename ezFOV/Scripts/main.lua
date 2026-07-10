@@ -162,6 +162,20 @@ Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
     end)
 end)
 
+-- ==================== Load-time hotkey gate ====================
+-- F8 live-reload is registered above and is ALWAYS available. The remaining tuning hotkeys
+-- (FOV, position, lock-on bias, and presets) are only registered when EnableTuningHotkeys is
+-- true. Set it to false in ezFOV.cfg for an "F8-only" build that avoids clashing with other
+-- mods' keybinds. Keybinds are registered once at load, so this applies on launch / reload.
+if not cfg.EnableTuningHotkeys then
+    log.debug(
+        "F8-only mode: EnableTuningHotkeys=false; skipping FOV/position/bias/preset keybinds.",
+        "tuning_hotkeys_disabled",
+        true
+    )
+    return
+end
+
 -- ==================== Helpers ====================
 
 local function ensure_lockon_enforcement(current_cfg)

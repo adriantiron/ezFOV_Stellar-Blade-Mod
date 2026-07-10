@@ -355,6 +355,7 @@ local function run_tests()
         rt.EnableWalkingCamera = false
         rt.EnableSprintingCamera = true
         rt.EnableLockOnCamera = false
+        rt.EnableTuningHotkeys = false
 
         -- Main writer emits the expected keys and formats.
         Config.write()
@@ -372,12 +373,17 @@ local function run_tests()
         )
         assert(written:find("DefaultCamX=10.0000", 1, true) ~= nil, "written cfg should contain DefaultCamX=10.0000")
         assert(written:find("LockOnYawBias=5.0", 1, true) ~= nil, "written cfg should contain LockOnYawBias=5.0")
+        assert(
+            written:find("EnableTuningHotkeys=false", 1, true) ~= nil,
+            "written cfg should contain the tuning hotkeys flag"
+        )
 
         -- Full round-trip through save_preset -> load_preset.
         Config.save_preset(99)
         rt.fovs.fov = 1
         rt.DisableCameraCollision = false
         rt.LockOnYawBias = 0
+        rt.EnableTuningHotkeys = true
         local loaded_ok = Config.load_preset(99)
         os.remove(rt.path .. "_preset99")
         assert(loaded_ok == true, "preset 99 should load")
@@ -413,6 +419,7 @@ local function run_tests()
         assert(rt.KeyFOVTransitionSteps == 15, "key fov transition steps should round-trip")
         assert(rt.LockOnExitBlendTime == 0.25, "blend time should round-trip")
         assert(rt.DisableCameraCollision == true, "collision flag should round-trip")
+        assert(rt.EnableTuningHotkeys == false, "tuning hotkeys flag should round-trip")
         assert(rt.EnableIdleCamera == false, "idle enable should round-trip")
         assert(rt.EnableWalkingCamera == false, "walking enable should round-trip")
         assert(rt.EnableSprintingCamera == true, "sprinting enable should round-trip")
