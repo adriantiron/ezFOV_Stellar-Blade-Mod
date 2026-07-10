@@ -1,6 +1,7 @@
 local Heartbeat = require("heartbeat")
 local Logging = require("logging")
 local Constants = require("constants")
+local UEObject = require("ue_object")
 
 local math_sqrt = math.sqrt
 
@@ -45,18 +46,7 @@ local function _notify_disable()
     end
 end
 
-local function obj_is_valid(obj)
-    if not obj then
-        return false
-    end
-    if type(obj.IsValid) ~= "function" then
-        return true
-    end
-    local ok, valid = pcall(function()
-        return obj:IsValid()
-    end)
-    return ok and valid == true
-end
+local obj_is_valid = UEObject.is_valid
 
 local _lockon_fn = nil
 local _lockon_tried = false

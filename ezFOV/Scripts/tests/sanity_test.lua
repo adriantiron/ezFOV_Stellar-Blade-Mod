@@ -115,9 +115,12 @@ local function run_tests()
         "./ezFOV/Scripts/logging.lua",
         "./ezFOV/Scripts/constants.lua",
         "./ezFOV/Scripts/profiles.lua",
+        "./ezFOV/Scripts/easing.lua",
+        "./ezFOV/Scripts/ue_object.lua",
         "./ezFOV/Scripts/heartbeat.lua",
         "./ezFOV/Scripts/playercontext.lua",
         "./ezFOV/Scripts/config.lua",
+        "./ezFOV/Scripts/camera_originals.lua",
         "./ezFOV/Scripts/camera.lua",
         "./ezFOV/Scripts/stance.lua",
         "./ezFOV/Scripts/hooks.lua",
@@ -153,6 +156,35 @@ local function run_tests()
     assert(type(Camera.begin_lockon_exit_blend) == "function", "camera module should expose begin_lockon_exit_blend")
     assert(type(Stance.pulse) == "function", "stance module should expose pulse")
     assert(type(Hooks.init) == "function", "hooks module should expose init")
+
+    -- Phase 6 extraction: shared UE validity guard + pure easing math + camera originals submodule.
+    local UEObject = require("ue_object")
+    assert(type(UEObject.is_valid) == "function", "ue_object module should expose is_valid")
+    assert(UEObject.is_valid(nil) == false, "is_valid returns false for a nil object")
+    assert(UEObject.is_valid({}) == true, "is_valid assumes validity when IsValid is absent")
+    local valid_stub = {
+        IsValid = function()
+            return true
+        end,
+    }
+    local invalid_stub = {
+        IsValid = function()
+            return false
+        end,
+    }
+    assert(UEObject.is_valid(valid_stub) == true, "is_valid honors a passing IsValid()")
+    assert(UEObject.is_valid(invalid_stub) == false, "is_valid honors a failing IsValid()")
+
+    local Easing = require("easing")
+    assert(type(Easing.quadratic) == "function", "easing module should expose quadratic")
+    assert(type(Easing.now_ms) == "function", "easing module should expose now_ms")
+    assert(Easing.quadratic(0, 10, 20, 4) == 10, "quadratic returns the begin value at t=0")
+    assert(Easing.quadratic(4, 10, 20, 4) == 30, "quadratic returns begin+change at t=d")
+    assert(Easing.quadratic(1, 0, 100, 0) == 100, "quadratic guards a zero duration (returns begin+change)")
+
+    local Originals = require("camera_originals")
+    assert(type(Originals.save) == "function", "camera_originals module should expose save")
+    assert(type(Originals.restore) == "function", "camera_originals module should expose restore")
 
     -- Logging cache behavior checks
     Logging.clear_once_cache()

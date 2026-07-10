@@ -1,7 +1,9 @@
-local UEHelpers = require("UEHelpers")
 local Env = require("env").bind("Camera")
 local PlayerCtx = require("playercontext")
 local Logging = require("logging")
+local Easing = require("easing")
+local Originals = require("camera_originals")
+local UEObject = require("ue_object")
 
 local math_abs = math.abs
 local math_sin = math.sin
@@ -11,6 +13,10 @@ local math_max = math.max
 local math_min = math.min
 local math_floor = math.floor
 local os_clock = os.clock
+
+local quadratic = Easing.quadratic
+local now_ms = Easing.now_ms
+local obj_is_valid = UEObject.is_valid
 
 local M = {
     _cfg = nil,
@@ -40,14 +46,9 @@ local M = {
     _enforce_pitch_bias = 0,
 }
 
-local restore_originals -- Forward declaration to fix the visibility crash!
-
 local _transition_busy = false
 local _queued_transition = nil
 local _enforce_token = nil
-
-local _originals_saved = false
-local _saved_originals = {}
 
 local _enf_cam = nil
 local _enf_boom = nil
@@ -82,19 +83,6 @@ local _LOCKON_DIAG_INTERVAL_SEC = 0.75
 
 -- Component-scoped logger (see Logging.for_component).
 local log = Logging.for_component("Camera")
-
-local function obj_is_valid(obj)
-    if not obj then
-        return false
-    end
-    if type(obj.IsValid) ~= "function" then
-        return true
-    end
-    local ok, valid = pcall(function()
-        return obj:IsValid()
-    end)
-    return ok and valid == true
-end
 
 local function safe_write(fn, context, once_key)
     local ok, err = pcall(fn)
@@ -260,93 +248,6 @@ PlayerCtx.on_disable(function()
     cancel_lockon_exit_blend()
     clear_enforcement_caches()
 end)
-
--- ==================== Helpers ====================
-
-local function quadratic(t, b, c, d)
-    if d == 0 then
-        return b + c
-    end -- Guard against division by zero
-    t = t / d
-    return -c * t * (t - 2) + b
-end
-
-local function now_ms()
-    return os_clock() * 1000.0
-end
-
--- ==================== Save / Restore ====================
-
-local function save_originals(snap)
-    if _originals_saved then
-        return
-    end
-    _originals_saved = true
-    _saved_originals = {}
-
-    if not snap then
-        log.error("Cannot save camera originals because the snapshot is unavailable.", "save_originals_no_snapshot")
-        return
-    end
-
-    if obj_is_valid(snap.boom) then
-        local to = snap.boom.TargetOffset
-        if to then
-            _saved_originals.target = { X = to.X, Y = to.Y, Z = to.Z }
-        end
-    end
-
-    if obj_is_valid(snap.cam) then
-        local rr = snap.cam.RelativeRotation
-        if rr then
-            _saved_originals.rel_rot = { Pitch = rr.Pitch, Yaw = rr.Yaw, Roll = rr.Roll }
-        end
-    end
-end
-
-local function restore_originals()
-    if not _originals_saved then
-        return
-    end
-
-    local snap = PlayerCtx.get_snapshot()
-    if snap then
-        if snap.boom and _saved_originals.target then
-            local to = snap.boom.TargetOffset
-            if to then
-                local pos_restore_ok = Env.run_now("restore_originals_target", function()
-                    to.X = _saved_originals.target.X
-                    to.Y = _saved_originals.target.Y
-                    to.Z = _saved_originals.target.Z
-                end)
-                if not pos_restore_ok then
-                    _originals_saved = false
-                    _saved_originals = {}
-                    return
-                end
-            end
-        end
-
-        if snap.cam and _saved_originals.rel_rot then
-            local rr = snap.cam.RelativeRotation
-            if rr then
-                local rot_restore_ok = Env.run_now("restore_originals_rotation", function()
-                    rr.Pitch = _saved_originals.rel_rot.Pitch
-                    rr.Yaw = _saved_originals.rel_rot.Yaw
-                    rr.Roll = _saved_originals.rel_rot.Roll
-                end)
-                if not rot_restore_ok then
-                    _originals_saved = false
-                    _saved_originals = {}
-                    return
-                end
-            end
-        end
-    end
-
-    _originals_saved = false
-    _saved_originals = {}
-end
 
 -- ==================== Transition check ====================
 
@@ -785,7 +686,7 @@ local function enf_validate_refs()
     end
 
     _enf_boom = boom
-    save_originals(snap)
+    Originals.save(snap)
     return true
 end
 
@@ -811,7 +712,7 @@ function M.cancel_lockon_exit_blend()
     cancel_lockon_exit_blend()
 end
 
-function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, duration_override)
+function M.begin_lockon_exit_blend(target_position, target_fov, _overrideSteps, duration_override)
     if PlayerCtx.camera_or_pc_invalid() then
         log.warn(
             "Lock-on exit blend skipped because the camera context is unavailable.",
@@ -1218,7 +1119,7 @@ function M.stop_enforcement()
 
     if was_active then
         -- Force the restoration helper to run inside the thread worker
-        restore_originals()
+        Originals.restore()
         log.debug("Enforcement stopped and original camera state restoration was requested.", "enforce_stop")
     end
 end
