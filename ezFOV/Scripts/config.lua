@@ -259,7 +259,7 @@ local function coerce(entry, value)
 end
 
 -- Build a fresh config populated from schema defaults plus the internal (non-persisted) fields.
-local function deep_copy_defaults()
+local function new_default_config()
     local cfg = { path = DEFAULT_PATH, fovs = { default = 75 } }
     for _, entry in ipairs(SCHEMA) do
         set_path(cfg, entry.path, entry.default)
@@ -300,7 +300,7 @@ local function load_file(path, container)
             )
             _config_corrupt_warned = true
         end
-        return deep_copy_defaults() -- Secure fallback
+        return new_default_config() -- Secure fallback
     end
 
     return container
@@ -310,7 +310,7 @@ local CURRENT = nil
 
 function M.get()
     if not CURRENT then
-        CURRENT = load_file(DEFAULT_PATH, deep_copy_defaults())
+        CURRENT = load_file(DEFAULT_PATH, new_default_config())
     end
     return CURRENT
 end
@@ -465,7 +465,7 @@ function M.load_preset(num)
     end
     test:close()
 
-    local container = deep_copy_defaults()
+    local container = new_default_config()
 
     -- Protect against internal structure fragmentation during preset load
     local ok, loaded = pcall(function()
