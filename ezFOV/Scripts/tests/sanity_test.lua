@@ -288,6 +288,112 @@ local function run_tests()
             and type(Constants.LOCO_SPRINT_MIN_SPEED) == "number",
         "constants should expose numeric locomotion thresholds"
     )
+
+    -- Config round-trip characterization: a full write -> read cycle must preserve every field.
+    -- This locks the key<->field mapping shared by write/save_preset/load_file so the upcoming
+    -- schema unification can be proven behavior-preserving. Values are chosen to be in-range and
+    -- format-safe (<=4 decimals for positions, <=1 for biases) so they survive the write format.
+    do
+        Config.reload()
+        local rt = Config.get()
+        local original_path = rt.path
+        rt.path = "./ezfov_roundtrip_tmp.cfg"
+
+        rt.fovs.fov = 85
+        rt.fovs.combat = 95
+        rt.fovs.lockon = 70
+        rt.fovs.tps = 65
+        rt.fovs.idle = 88
+        rt.fovs.walk = 92
+        rt.fovs.sprint = 100
+        rt.DefaultPosition = { x = 10.0, y = 20.0, z = 30.0 }
+        rt.CombatPosition = { x = 40.0, y = 50.0, z = 60.0 }
+        rt.LockOnPosition = { x = 70.0, y = 0.0, z = 15.0 }
+        rt.IdlePosition = { x = 200.0, y = 5.0, z = 10.0 }
+        rt.WalkPosition = { x = 210.0, y = 6.0, z = 11.0 }
+        rt.SprintPosition = { x = 220.0, y = 7.0, z = 12.0 }
+        rt.LockOnYawBias = 5.0
+        rt.LockOnPitchBias = -3.0
+        rt.FOVTransitionSteps = 40
+        rt.KeyFOVTransitionSteps = 15
+        rt.LockOnExitBlendTime = 0.25
+        rt.DisableCameraCollision = true
+        rt.EnableIdleCamera = false
+        rt.EnableWalkingCamera = false
+        rt.EnableSprintingCamera = true
+        rt.EnableLockOnCamera = false
+
+        -- Main writer emits the expected keys and formats.
+        Config.write()
+        local wf = io.open(rt.path, "r")
+        local written = wf and wf:read("*a") or ""
+        if wf then
+            wf:close()
+        end
+        os.remove(rt.path)
+        assert(wf ~= nil, "Config.write should produce the config file")
+        assert(written:find("FOV=85", 1, true) ~= nil, "written cfg should contain FOV=85")
+        assert(written:find("DisableCameraCollision=true", 1, true) ~= nil, "written cfg should contain the collision flag")
+        assert(written:find("DefaultCamX=10.0000", 1, true) ~= nil, "written cfg should contain DefaultCamX=10.0000")
+        assert(written:find("LockOnYawBias=5.0", 1, true) ~= nil, "written cfg should contain LockOnYawBias=5.0")
+
+        -- Full round-trip through save_preset -> load_preset.
+        Config.save_preset(99)
+        rt.fovs.fov = 1
+        rt.DisableCameraCollision = false
+        rt.LockOnYawBias = 0
+        local loaded_ok = Config.load_preset(99)
+        os.remove(rt.path .. "_preset99")
+        assert(loaded_ok == true, "preset 99 should load")
+
+        assert(rt.fovs.fov == 85, "fov should round-trip")
+        assert(rt.fovs.combat == 95, "combat fov should round-trip")
+        assert(rt.fovs.lockon == 70, "lockon fov should round-trip")
+        assert(rt.fovs.tps == 65, "tps fov should round-trip")
+        assert(rt.fovs.idle == 88, "idle fov should round-trip")
+        assert(rt.fovs.walk == 92, "walk fov should round-trip")
+        assert(rt.fovs.sprint == 100, "sprint fov should round-trip")
+        assert(rt.DefaultPosition.x == 10 and rt.DefaultPosition.y == 20 and rt.DefaultPosition.z == 30, "default pos round-trip")
+        assert(rt.CombatPosition.x == 40 and rt.CombatPosition.y == 50 and rt.CombatPosition.z == 60, "combat pos round-trip")
+        assert(rt.LockOnPosition.x == 70 and rt.LockOnPosition.y == 0 and rt.LockOnPosition.z == 15, "lockon pos round-trip")
+        assert(rt.IdlePosition.x == 200 and rt.IdlePosition.y == 5 and rt.IdlePosition.z == 10, "idle pos round-trip")
+        assert(rt.WalkPosition.x == 210 and rt.WalkPosition.y == 6 and rt.WalkPosition.z == 11, "walk pos round-trip")
+        assert(rt.SprintPosition.x == 220 and rt.SprintPosition.y == 7 and rt.SprintPosition.z == 12, "sprint pos round-trip")
+        assert(rt.LockOnYawBias == 5.0, "yaw bias should round-trip")
+        assert(rt.LockOnPitchBias == -3.0, "pitch bias should round-trip")
+        assert(rt.FOVTransitionSteps == 40, "fov transition steps should round-trip")
+        assert(rt.KeyFOVTransitionSteps == 15, "key fov transition steps should round-trip")
+        assert(rt.LockOnExitBlendTime == 0.25, "blend time should round-trip")
+        assert(rt.DisableCameraCollision == true, "collision flag should round-trip")
+        assert(rt.EnableIdleCamera == false, "idle enable should round-trip")
+        assert(rt.EnableWalkingCamera == false, "walking enable should round-trip")
+        assert(rt.EnableSprintingCamera == true, "sprinting enable should round-trip")
+        assert(rt.EnableLockOnCamera == false, "lock-on enable should round-trip")
+
+        rt.path = original_path
+        Config.reload()
+    end
+
+    -- FOV clamp folded into load: out-of-range values are bounded to Constants.FOV_MIN/MAX and
+    -- the lock-on exit blend time is floored, regardless of what the file/preset contains.
+    do
+        Config.reload()
+        local rt = Config.get()
+        local original_path = rt.path
+        rt.path = "./ezfov_clamp_tmp.cfg"
+        local pf = io.open(rt.path .. "_preset98", "w")
+        assert(pf ~= nil, "clamp test should be able to write its preset file")
+        pf:write("FOV=200\nCombatFOV=5\nLockOnExitBlendTime=0.001\n")
+        pf:close()
+        local clamp_ok = Config.load_preset(98)
+        os.remove(rt.path .. "_preset98")
+        assert(clamp_ok == true, "clamp preset should load")
+        assert(rt.fovs.fov == Constants.FOV_MAX, "over-max FOV should clamp to FOV_MAX on load")
+        assert(rt.fovs.combat == Constants.FOV_MIN, "under-min FOV should clamp to FOV_MIN on load")
+        assert(rt.LockOnExitBlendTime >= 0.02, "blend time should be floored at 0.02 on load")
+        rt.path = original_path
+        Config.reload()
+    end
 end
 
 local function format_error(err)
