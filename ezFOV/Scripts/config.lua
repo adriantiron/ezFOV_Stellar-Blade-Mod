@@ -226,8 +226,6 @@ local function load_file(path, container)
                     -- so the mod falls back safely to the hardcoded defaults.
                 end
             end
-
-            ::continue::
         end
     end)
 

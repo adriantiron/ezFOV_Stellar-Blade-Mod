@@ -36,6 +36,8 @@ local function log_debug(message, once_key, cache)
 end
 -- ========================================================================================
 
+local _ready_warned = false
+
 function M.init(cameraMod, configMod)
     Camera = cameraMod
     Config = configMod
@@ -45,7 +47,6 @@ end
 local _lockon_last_true = os.clock() -- Initialize to the active engine clock instead of 0
 local _LOCKON_EXIT_GRACE = 0.4
 local _grace_logged = false
-local _ready_warned = false
 
 local function safe_call(fn, context)
     local r = nil

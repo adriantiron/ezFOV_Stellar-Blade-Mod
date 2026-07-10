@@ -19,7 +19,7 @@ local function log_debug(message, once_key, cache)
 end
 -- ========================================================================================
 
-Heartbeat = {
+local Heartbeat = {
     disabled = true,
     cap = 3,
     enable_window_ms = 180,

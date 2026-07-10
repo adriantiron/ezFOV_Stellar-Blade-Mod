@@ -861,8 +861,6 @@ function M.begin_lockon_exit_blend(target_position, target_fov, overrideSteps, d
         from_pos = { x = loc.X or 0, y = loc.Y or 0, z = loc.Z or 0 }
     end
 
-    ---@type any
-    local cam_any = cam
     local from_fov = cam_any.ManualCameraFov
     if from_fov == nil then
         from_fov = (cfg and cfg.fovs and cfg.fovs.fov) or 75
