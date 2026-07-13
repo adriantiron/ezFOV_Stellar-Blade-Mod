@@ -10,9 +10,7 @@ function UEObject.is_valid(obj)
     if type(obj.IsValid) ~= "function" then
         return true
     end
-    local ok, valid = pcall(function()
-        return obj:IsValid()
-    end)
+    local ok, valid = pcall(obj.IsValid, obj)
     return ok and valid == true
 end
 
