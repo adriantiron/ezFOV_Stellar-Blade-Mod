@@ -38,7 +38,7 @@ local M = {
     _lockon_exit_to_pos = nil,
     _lockon_exit_from_fov = nil,
     _lockon_exit_to_fov = nil,
-    _lockon_exit_from_target = nil,
+    _lockon_exit_lockon_off = nil,
     _lockon_exit_to_target = nil,
     _lockon_exit_from_rot = nil,
     _lockon_exit_to_rot = nil,
@@ -236,7 +236,7 @@ local function cancel_lockon_exit_blend()
     M._lockon_exit_to_pos = nil
     M._lockon_exit_from_fov = nil
     M._lockon_exit_to_fov = nil
-    M._lockon_exit_from_target = nil
+    M._lockon_exit_lockon_off = nil
     M._lockon_exit_to_target = nil
     M._lockon_exit_from_rot = nil
     M._lockon_exit_to_rot = nil
@@ -783,24 +783,25 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
         to_fov = (cfg and cfg.fovs and cfg.fovs.jog) or from_fov
     end
 
-    -- Capture the lock-on TargetOffset (boom) and RelativeRotation (cam) so the blend can ease
-    -- them back to their pre-lock-on originals instead of leaving them orphaned at lock-on values.
-    local from_target, to_target = nil, nil
+    -- Capture the lock-on offset + RelativeRotation so the blend can ease them back to their
+    -- pre-lock-on originals. For position we keep the RAW lock-on offset (lateral/depth/height)
+    -- rather than the frozen world vector, so the blend can re-apply the current yaw each tick and
+    -- shrink it in FACING space -- otherwise a frozen world vector sweeps an arc as the camera
+    -- un-tracks during the blend.
+    local lockon_off, to_target = nil, nil
     local from_rot, to_rot = nil, nil
     local saved = Originals.get_saved()
     if saved then
-        if saved.target and obj_is_valid(snap.boom) then
-            local bto = snap.boom.TargetOffset
-            if bto then
-                from_target = { x = bto.X or 0, y = bto.Y or 0, z = bto.Z or 0 }
-                to_target = { x = saved.target.X or 0, y = saved.target.Y or 0, z = saved.target.Z or 0 }
-            end
+        if saved.target and obj_is_valid(snap.boom) and M._enforce_pos then
+            lockon_off = { x = M._enforce_pos.x or 0, y = M._enforce_pos.y or 0, z = M._enforce_pos.z or 0 }
+            to_target = { x = saved.target.X or 0, y = saved.target.Y or 0, z = saved.target.Z or 0 }
         end
         if saved.rel_rot then
             local rr = cam_any.RelativeRotation
             if rr then
                 from_rot = { pitch = rr.Pitch or 0, yaw = rr.Yaw or 0, roll = rr.Roll or 0 }
-                to_rot = { pitch = saved.rel_rot.Pitch or 0, yaw = saved.rel_rot.Yaw or 0, roll = saved.rel_rot.Roll or 0 }
+                to_rot =
+                    { pitch = saved.rel_rot.Pitch or 0, yaw = saved.rel_rot.Yaw or 0, roll = saved.rel_rot.Roll or 0 }
             end
         end
     end
@@ -837,7 +838,7 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
     M._lockon_exit_to_pos = to_pos
     M._lockon_exit_from_fov = from_fov
     M._lockon_exit_to_fov = to_fov
-    M._lockon_exit_from_target = from_target
+    M._lockon_exit_lockon_off = lockon_off
     M._lockon_exit_to_target = to_target
     M._lockon_exit_from_rot = from_rot
     M._lockon_exit_to_rot = to_rot
@@ -897,15 +898,22 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
             end
         end
 
-        -- Ease the boom TargetOffset back toward its original (best-effort; never aborts the blend).
-        if M._lockon_exit_from_target and M._lockon_exit_to_target and obj_is_valid(snap_now.boom) then
+        -- Shrink the lock-on TargetOffset toward its original in FACING space: re-apply the
+        -- current yaw each tick to the fading lock-on offset, easing the original in as it fades.
+        if M._lockon_exit_lockon_off and M._lockon_exit_to_target and obj_is_valid(snap_now.boom) then
             local bto = snap_now.boom.TargetOffset
             if bto then
-                local ft, tt = M._lockon_exit_from_target, M._lockon_exit_to_target
+                local off, tt = M._lockon_exit_lockon_off, M._lockon_exit_to_target
+                local scale = 1 - eased
+                local sin_y, cos_y = get_yaw_sincos(snap_now)
+                local lat = (off.x or 0) * scale
+                local dep = (off.y or 0) * scale
+                local wx = lat * -sin_y + dep * cos_y
+                local wy = lat * cos_y + dep * sin_y
                 safe_write(function()
-                    bto.X = ft.x + (tt.x - ft.x) * eased
-                    bto.Y = ft.y + (tt.y - ft.y) * eased
-                    bto.Z = ft.z + (tt.z - ft.z) * eased
+                    bto.X = wx + tt.x * eased
+                    bto.Y = wy + tt.y * eased
+                    bto.Z = (off.z or 0) * scale + tt.z * eased
                 end, "lockon_exit_write_target")
             end
         end
@@ -956,7 +964,7 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
             end
         end
 
-        if M._lockon_exit_from_target and M._lockon_exit_to_target and obj_is_valid(snap_now.boom) then
+        if M._lockon_exit_lockon_off and M._lockon_exit_to_target and obj_is_valid(snap_now.boom) then
             local bto = snap_now.boom.TargetOffset
             if bto then
                 local tt = M._lockon_exit_to_target
