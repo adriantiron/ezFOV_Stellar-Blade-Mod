@@ -156,7 +156,6 @@ function Env.bind(component)
     return {
         ExecuteInGameThread = Env.ExecuteInGameThread,
         ExecuteWithDelay = Env.ExecuteWithDelay,
-        CancelDelay = Env.CancelDelay,
         RegisterKeyBindAsync = Env.RegisterKeyBindAsync,
         RegisterHook = Env.RegisterHook,
         UnregisterHook = Env.UnregisterHook,

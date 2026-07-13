@@ -217,7 +217,7 @@ end
 
 local function cancel_lockon_exit_blend()
     if M._lockon_exit_token then
-        Env.CancelDelay(M._lockon_exit_token)
+        Env.cancel_delay(M._lockon_exit_token)
         M._lockon_exit_token = nil
     end
     M._lockon_exit_active = false
@@ -231,13 +231,13 @@ end
 
 PlayerCtx.on_disable(function()
     if M._fov_transition_token then
-        Env.CancelDelay(M._fov_transition_token)
+        Env.cancel_delay(M._fov_transition_token)
         M._fov_transition_token = nil
     end
     M._active_target_fov = nil
 
     if M._cam_transition_token then
-        Env.CancelDelay(M._cam_transition_token)
+        Env.cancel_delay(M._cam_transition_token)
         M._cam_transition_token = nil
     end
     M._active_target_position = nil
@@ -281,7 +281,7 @@ function M.set_fov_via_function(target_fov, override_steps)
     end
 
     if M._fov_transition_token then
-        Env.CancelDelay(M._fov_transition_token)
+        Env.cancel_delay(M._fov_transition_token)
         M._fov_transition_token = nil
     end
     M._active_target_fov = target_fov
@@ -403,7 +403,7 @@ function M.set_camera_relative_location(target_position, override_steps)
     end
 
     if M._cam_transition_token then
-        Env.CancelDelay(M._cam_transition_token)
+        Env.cancel_delay(M._cam_transition_token)
         M._cam_transition_token = nil
     end
 
@@ -699,7 +699,7 @@ local function stop_enforcement_loop()
     M._lockon_was_active = false
 
     if _enforce_token then
-        Env.CancelDelay(_enforce_token)
+        Env.cancel_delay(_enforce_token)
         _enforce_token = nil
     end
 
@@ -779,11 +779,11 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
     end
 
     if M._fov_transition_token then
-        Env.CancelDelay(M._fov_transition_token)
+        Env.cancel_delay(M._fov_transition_token)
         M._fov_transition_token = nil
     end
     if M._cam_transition_token then
-        Env.CancelDelay(M._cam_transition_token)
+        Env.cancel_delay(M._cam_transition_token)
         M._cam_transition_token = nil
     end
     M._active_target_fov = nil
@@ -899,11 +899,11 @@ end
 
 function M.start_enforcement(pos, fov)
     if M._cam_transition_token then
-        Env.CancelDelay(M._cam_transition_token)
+        Env.cancel_delay(M._cam_transition_token)
         M._cam_transition_token = nil
     end
     if M._fov_transition_token then
-        Env.CancelDelay(M._fov_transition_token)
+        Env.cancel_delay(M._fov_transition_token)
         M._fov_transition_token = nil
     end
 
