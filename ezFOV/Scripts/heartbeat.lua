@@ -13,6 +13,12 @@ local log = Logging.for_component("Heartbeat")
 -- at the drop boundary; also caps any added drop-detection latency to this value (~1 frame).
 local WATCHDOG_MIN_CHECK_MS = 16
 
+-- Ceiling for the watchdog interval. Bounds the steady-state check rate (~1/this) and the
+-- longest single timer, trimming host timer jitter. The final pre-deadline re-arm is still
+-- sized to the exact remaining time (<= this), so drop detection lands on _last_ms + drop_ms
+-- rather than a coarse grid -- i.e. tighter cadence WITHOUT adding drop latency.
+local WATCHDOG_MAX_CHECK_MS = 100
+
 local Heartbeat = {
     disabled = true,
     cap = 3,
@@ -84,11 +90,14 @@ function Heartbeat._on_watchdog()
     local since = now_ms() - (Heartbeat._last_ms or 0)
 
     if since < drop_ms then
-        -- Still ticking. Re-arm for exactly the time remaining until the current last pulse
-        -- would age past drop_ms, so drop detection fires at _last_ms + drop_ms -- the same
-        -- instant the old per-frame debounce would have fired.
+        -- Still ticking. Re-arm for the time remaining until the current last pulse would age
+        -- past drop_ms, capped at WATCHDOG_MAX_CHECK_MS so the cadence stays ~10/sec. When the
+        -- deadline is within the cap the arm equals `remaining`, so drop detection fires at
+        -- _last_ms + drop_ms -- the same instant the old per-frame debounce would have fired.
         local remaining = drop_ms - since
-        if remaining < WATCHDOG_MIN_CHECK_MS then
+        if remaining > WATCHDOG_MAX_CHECK_MS then
+            remaining = WATCHDOG_MAX_CHECK_MS
+        elseif remaining < WATCHDOG_MIN_CHECK_MS then
             remaining = WATCHDOG_MIN_CHECK_MS
         end
         Heartbeat._arm_watchdog(remaining)
