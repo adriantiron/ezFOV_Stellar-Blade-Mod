@@ -76,7 +76,7 @@ function Heartbeat.pulse()
     local drop_ms = Heartbeat.drop_ms
 
     if Heartbeat._drop_token then
-        Env.CancelDelay(Heartbeat._drop_token)
+        Env.cancel_delay(Heartbeat._drop_token)
         Heartbeat._drop_token = nil
     end
 
@@ -113,7 +113,7 @@ function Heartbeat.set_thresholds(n, win_ms, drop_ms)
         Heartbeat.drop_ms = math_floor(drop_ms)
     end
     if Heartbeat._drop_token then
-        Env.CancelDelay(Heartbeat._drop_token)
+        Env.cancel_delay(Heartbeat._drop_token)
         Heartbeat._drop_token = nil
     end
     Heartbeat._reset_buf()

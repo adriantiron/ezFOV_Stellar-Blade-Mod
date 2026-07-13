@@ -22,13 +22,14 @@ function Originals.save(snap)
     if _originals_saved then
         return
     end
-    _originals_saved = true
-    _saved_originals = {}
 
     if not snap then
         log.error("Cannot save camera originals because the snapshot is unavailable.")
         return
     end
+
+    _originals_saved = true
+    _saved_originals = {}
 
     if obj_is_valid(snap.boom) then
         local to = snap.boom.TargetOffset
@@ -83,10 +84,10 @@ function Originals.restore()
                 end
             end
         end
-    end
 
-    _originals_saved = false
-    _saved_originals = {}
+        _originals_saved = false
+        _saved_originals = {}
+    end
 end
 
 return Originals

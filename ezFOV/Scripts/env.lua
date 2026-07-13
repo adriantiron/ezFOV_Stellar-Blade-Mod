@@ -83,6 +83,15 @@ function Env.run_after_delay(component, delay_ms, context, fn)
     end)
 end
 
+-- Best-effort cancel of a delay token. Silent no-op when the token is absent or the host
+-- CancelDelay API is unavailable (never logs: it can run on the per-frame path).
+function Env.cancel_delay(token)
+    local cancel = Env.CancelDelay
+    if token ~= nil and type(cancel) == "function" then
+        cancel(token)
+    end
+end
+
 function Env.register_safe_keybind(component, key, modifiers, label, fn)
     local register = Env.RegisterKeyBindAsync
     if type(register) ~= "function" then
@@ -158,6 +167,9 @@ function Env.bind(component)
         end,
         run_after_delay = function(delay_ms, context, fn)
             return Env.run_after_delay(scope, delay_ms, context, fn)
+        end,
+        cancel_delay = function(token)
+            return Env.cancel_delay(token)
         end,
         run_now = function(context, fn)
             return Env.run_now(scope, context, fn)

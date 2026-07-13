@@ -11,7 +11,7 @@ local log = Logging.for_component("Config")
 
 local DEFAULT_PATH = "UE4SS/Mods/ezFOV/ezFOV.cfg"
 
--- fovs.default and path are internal and never persisted to the .cfg, so they live outside SCHEMA.
+-- path is internal and never persisted to the .cfg, so it lives outside SCHEMA.
 local FOV_CLAMP = { min = Constants.FOV_MIN, max = Constants.FOV_MAX }
 
 -- Ordered config schema: the SINGLE source of truth for every persisted .cfg key. It drives the
@@ -260,7 +260,7 @@ end
 
 -- Build a fresh config populated from schema defaults plus the internal (non-persisted) fields.
 local function new_default_config()
-    local cfg = { path = DEFAULT_PATH, fovs = { default = 75 } }
+    local cfg = { path = DEFAULT_PATH, fovs = {} }
     for _, entry in ipairs(SCHEMA) do
         set_path(cfg, entry.path, entry.default)
     end
@@ -402,7 +402,7 @@ local _save_timer = nil
 function M.write()
     -- Cancel any pending save if the user presses a hotkey again within 200ms
     if _save_timer then
-        Env.CancelDelay(_save_timer)
+        Env.cancel_delay(_save_timer)
     end
 
     -- Wait 200ms after the user finishes adjusting before writing to disk
@@ -478,7 +478,7 @@ end
 
 function M.cancel_pending_write()
     if _save_timer then
-        Env.CancelDelay(_save_timer)
+        Env.cancel_delay(_save_timer)
         _save_timer = nil
     end
 end
