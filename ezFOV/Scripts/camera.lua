@@ -384,9 +384,9 @@ function M.set_camera_relative_location(target_position, override_steps)
     end
 
     local cfg_steps = (M._cfg and M._cfg.FOVTransitionSteps) or 100
+    -- steps_units is the transition duration in milliseconds directly.
     local steps_units = override_steps or math_max(cfg_steps, 10)
-    local unit = (M._cfg and M._cfg.TransitionTimeUnit) or 3
-    local duration_ms = math_max(steps_units * unit, 10)
+    local duration_ms = math_max(steps_units, 10)
 
     if _transition_busy then
         if
