@@ -275,8 +275,8 @@ function H.init(Camera, Config)
                             begin_cold_apply_bootstrap()
                             -- Only set _cold_applied if the camera is actually reachable
                             local cam_ok = Env.run_on_game_thread("cold_apply", function()
-                                H.camera.set_fov_via_function(cfg.fovs.fov)
-                                H.camera.set_camera_relative_location(cfg.DefaultPosition)
+                                H.camera.set_fov_via_function(cfg.fovs.jog)
+                                H.camera.set_camera_relative_location(cfg.JogPosition)
                                 H.camera.disable_camera_collision(cfg.DisableCameraCollision)
 
                                 complete_cold_apply_bootstrap()

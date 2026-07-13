@@ -590,11 +590,11 @@ function M.init(cfg)
     M._already_initialized = true
 
     Env.run_on_game_thread("camera_init_set_fov", function()
-        M.set_fov_via_function(cfg.fovs.fov)
+        M.set_fov_via_function(cfg.fovs.jog)
     end)
 
     Env.run_on_game_thread("camera_init_set_position", function()
-        M.set_camera_relative_location(cfg.DefaultPosition)
+        M.set_camera_relative_location(cfg.JogPosition)
     end)
 end
 
@@ -752,7 +752,7 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
 
     local from_fov = cam_any.ManualCameraFov
     if from_fov == nil then
-        from_fov = (cfg and cfg.fovs and cfg.fovs.fov) or 75
+        from_fov = (cfg and cfg.fovs and cfg.fovs.jog) or 75
     end
 
     local to_pos = nil
@@ -766,7 +766,7 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
 
     local to_fov = target_fov
     if to_fov == nil then
-        to_fov = (cfg and cfg.fovs and cfg.fovs.fov) or from_fov
+        to_fov = (cfg and cfg.fovs and cfg.fovs.jog) or from_fov
     end
 
     if to_fov == nil and (not to_pos or (to_pos.x == 0 and to_pos.y == 0 and to_pos.z == 0)) then

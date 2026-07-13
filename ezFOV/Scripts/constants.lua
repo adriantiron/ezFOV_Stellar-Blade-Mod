@@ -11,8 +11,8 @@ local Constants = {
 
     -- Locomotion classification thresholds: 2D horizontal speed in cm/s.
     LOCO_IDLE_MAX_SPEED = 120, -- speed below this = idle
-    LOCO_SLOW_WALK_MAX_SPEED = 240, -- speed below this (and >= idle) = slow walk
-    LOCO_SPRINT_MIN_SPEED = 550, -- speed above this = sprint; between the two walk bounds = walk
+    LOCO_WALK_MAX_SPEED = 240, -- speed below this (and >= idle) = walk
+    LOCO_SPRINT_MIN_SPEED = 550, -- speed above this = sprint; between this and walk = jog
 }
 
 return Constants

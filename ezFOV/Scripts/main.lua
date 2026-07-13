@@ -24,21 +24,21 @@ end
 
 log.debug(
     string.format(
-        "Initial config: FOV(default=%.0f,fov=%.0f,combat=%.0f,tps=%.0f,idle=%.0f,walk=%.0f,sprint=%.0f,lockon=%.0f) "
-            .. "Pos(default=(%.0f,%.0f,%.0f),combat=(%.0f,%.0f,%.0f),lockon=(%.0f,%.0f,%.0f),idle=(%.0f,%.0f,%.0f),walk=(%.0f,%.0f,%.0f),sprint=(%.0f,%.0f,%.0f)) "
+        "Initial config: FOV(default=%.0f,jog=%.0f,combat=%.0f,tps=%.0f,idle=%.0f,walk=%.0f,sprint=%.0f,lockon=%.0f) "
+            .. "Pos(jog=(%.0f,%.0f,%.0f),combat=(%.0f,%.0f,%.0f),lockon=(%.0f,%.0f,%.0f),idle=(%.0f,%.0f,%.0f),walk=(%.0f,%.0f,%.0f),sprint=(%.0f,%.0f,%.0f)) "
             .. "flags(lockon=%s,idle=%s,walk=%s,sprint=%s,collision=%s) "
             .. "bias(yaw=%.1f,pitch=%.1f) exit_blend=%.3f steps(fov=%d,key=%d)",
         cfg.fovs.default or 0,
-        cfg.fovs.fov or 0,
+        cfg.fovs.jog or 0,
         cfg.fovs.combat or 0,
         cfg.fovs.tps or 0,
         cfg.fovs.idle or 0,
         cfg.fovs.walk or 0,
         cfg.fovs.sprint or 0,
         cfg.fovs.lockon or 0,
-        cfg.DefaultPosition.x or 0,
-        cfg.DefaultPosition.y or 0,
-        cfg.DefaultPosition.z or 0,
+        cfg.JogPosition.x or 0,
+        cfg.JogPosition.y or 0,
+        cfg.JogPosition.z or 0,
         cfg.CombatPosition.x or 0,
         cfg.CombatPosition.y or 0,
         cfg.CombatPosition.z or 0,
@@ -191,7 +191,7 @@ local function ensure_lockon_enforcement(current_cfg)
     if Camera.is_enforcing() then
         return
     end
-    local fov = current_cfg.fovs.lockon or current_cfg.fovs.combat or current_cfg.fovs.fov
+    local fov = current_cfg.fovs.lockon or current_cfg.fovs.combat or current_cfg.fovs.jog
     Camera.start_enforcement(current_cfg.LockOnPosition, fov)
     log.debug("Restarted dead enforcement loop", "restart_enforcement")
 end

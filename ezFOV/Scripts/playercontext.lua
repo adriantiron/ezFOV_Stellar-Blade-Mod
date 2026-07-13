@@ -14,8 +14,8 @@ local PlayerCtx = {
     _on_disable = {},
     LOCO_STATES = {
         idle = "idle",
-        slow_walk = "slow_walk",
         walk = "walk",
+        jog = "jog",
         sprint = "sprint",
     },
 }
@@ -464,12 +464,12 @@ function PlayerCtx.get_locomotion_state()
     local new_state
     if speed2D < Constants.LOCO_IDLE_MAX_SPEED then
         new_state = PlayerCtx.LOCO_STATES.idle
-    elseif speed2D < Constants.LOCO_SLOW_WALK_MAX_SPEED then
-        new_state = PlayerCtx.LOCO_STATES.slow_walk
+    elseif speed2D < Constants.LOCO_WALK_MAX_SPEED then
+        new_state = PlayerCtx.LOCO_STATES.walk
     elseif speed2D > Constants.LOCO_SPRINT_MIN_SPEED then
         new_state = PlayerCtx.LOCO_STATES.sprint
     else
-        new_state = PlayerCtx.LOCO_STATES.walk
+        new_state = PlayerCtx.LOCO_STATES.jog
     end
 
     local now = os.clock()

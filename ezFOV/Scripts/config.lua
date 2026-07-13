@@ -68,15 +68,15 @@ local SCHEMA = {
     },
 
     {
-        key = "DefaultCamX",
-        path = { "DefaultPosition", "x" },
+        key = "JogCamX",
+        path = { "JogPosition", "x" },
         kind = "number",
         default = 0,
         fmt = "%.4f",
-        section = banner("; DEFAULT CAMERA OFFSETS (Exploration & Idle)"),
+        section = banner("; JOG CAMERA OFFSETS (Exploration & Idle)"),
     },
-    { key = "DefaultCamY", path = { "DefaultPosition", "y" }, kind = "number", default = 0, fmt = "%.4f" },
-    { key = "DefaultCamZ", path = { "DefaultPosition", "z" }, kind = "number", default = 0, fmt = "%.4f" },
+    { key = "JogCamY", path = { "JogPosition", "y" }, kind = "number", default = 0, fmt = "%.4f" },
+    { key = "JogCamZ", path = { "JogPosition", "z" }, kind = "number", default = 0, fmt = "%.4f" },
 
     {
         key = "CombatCamX",
@@ -160,7 +160,7 @@ local SCHEMA = {
 
     {
         key = "FOV",
-        path = { "fovs", "fov" },
+        path = { "fovs", "jog" },
         kind = "number",
         default = 90,
         clamp = FOV_CLAMP,
@@ -323,7 +323,7 @@ local HEADER = [[; =============================================================
 ;
 ; THE COORDINATE MATRIX SYSTEMS:
 ;
-;   1) FOR STANDARD MODES (Default, Combat, Idle, Walk, Sprint):
+;   1) FOR STANDARD MODES (Jog, Combat, Idle, Walk, Sprint):
 ;      Uses Unreal's Local Attachment Space:
 ;      X = Forward & Backward / Depth (+In / -Out) -> Acts like a zoom!
 ;      Y = Sideways / Lateral Offset (+Right / -Left)

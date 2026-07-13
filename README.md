@@ -7,7 +7,7 @@ config file is optional.
 
 ## Features
 
-- **Per-context FOV & camera offsets** — separate settings for Default, Combat, Lock-on, Idle, Walk, Sprint, and TPS.
+- **Per-context FOV & camera offsets** — separate settings for Jog, Combat, Lock-on, Idle, Walk, Sprint, and TPS.
 - **Smooth transitions** — eased FOV/position moves, with a dedicated lock-on entry and exit blend so the camera never snaps.
 - **Lock-on target framing** — yaw/pitch bias for over-the-shoulder composition.
 - **Live reload** — press `F8` to apply `ezFOV.cfg` changes instantly, no restart.

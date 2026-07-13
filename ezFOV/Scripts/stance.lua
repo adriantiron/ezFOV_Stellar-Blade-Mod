@@ -4,7 +4,7 @@ local Logging = require("logging")
 local Profiles = require("profiles")
 
 local math_abs = math.abs
-local P = Profiles.PROFILES
+local PRFL = Profiles.PROFILES
 
 local M = {
     _last_tick = 0.0,
@@ -64,30 +64,30 @@ end
 -- target toggle does not snap the camera).
 local function choose_profile(state, cfg)
     if type(state) ~= "table" then
-        return P.default
+        return PRFL.jog
     end
 
     -- TPS overrides everything and short-circuits before the config check (matches
     -- resolve_profile's top priority) so it still resolves if the config briefly goes invalid.
     if state.tps == true then
-        return P.tps
+        return PRFL.tps
     end
 
     local current_cfg = cfg or (Config and Config.get())
     if not current_cfg or type(current_cfg) ~= "table" or type(current_cfg.fovs) ~= "table" then
         log.error("Profile selection aborted because the runtime config is invalid.")
-        return P.default
+        return PRFL.jog
     end
 
     -- Fresh lock-on: (re)arm the grace timer and take the lock-on profile.
     if state.lockon == true and current_cfg.EnableLockOnCamera then
         _lockon_last_true = os.clock()
         _grace_logged = false
-        return P.lockon
+        return PRFL.lockon
     end
 
     -- Lock-on just released: hold the lock-on profile until the grace window elapses.
-    if M._applied_profile == P.lockon and current_cfg.EnableLockOnCamera then
+    if M._applied_profile == PRFL.lockon and current_cfg.EnableLockOnCamera then
         local since_last = os.clock() - _lockon_last_true
         if since_last < _LOCKON_EXIT_GRACE then
             if not _grace_logged then
@@ -101,12 +101,12 @@ local function choose_profile(state, cfg)
                     true
                 )
             end
-            return P.lockon
+            return PRFL.lockon
         end
         log.debug("Lock-on grace period expired, exiting lock-on", "lockon_grace_expired", true)
     end
 
-    -- No lock-on override active: defer to the pure resolver for battle / locomotion / default.
+    -- No lock-on override active: defer to the pure resolver for battle / locomotion / jog.
     return Profiles.resolve_profile(state, current_cfg, PlayerCtx.LOCO_STATES)
 end
 
@@ -136,7 +136,7 @@ end
 
 local function apply_position_for_profile(profile, cfg, steps_override)
     -- Lock-on is driven by the enforcement loop and tps keeps its position; neither uses this path.
-    if profile == P.lockon or profile == P.tps then
+    if profile == PRFL.lockon or profile == PRFL.tps then
         return
     end
 
@@ -160,7 +160,7 @@ local function apply_lockon_profile(cfg)
         return
     end
 
-    local fov = Profiles.fov_for_profile(P.lockon, cfg)
+    local fov = Profiles.fov_for_profile(PRFL.lockon, cfg)
     M._applied_fov = fov
 
     if Camera.is_enforcing and Camera.is_enforcing() then
@@ -184,7 +184,7 @@ end
 
 local function apply_profile(profile, cfg)
     if profile == M._applied_profile then
-        if profile == P.lockon then
+        if profile == PRFL.lockon then
             apply_lockon_profile(cfg)
         end
         return
@@ -193,7 +193,7 @@ local function apply_profile(profile, cfg)
     local prev = M._applied_profile
     M._applied_profile = profile
 
-    if profile == P.lockon then
+    if profile == PRFL.lockon then
         apply_lockon_profile(cfg)
         return
     end
@@ -202,26 +202,26 @@ local function apply_profile(profile, cfg)
     local steps_override = nil
 
     -- Slow the transition when entering a traversal/resting state, or when leaving one back to
-    -- default/combat, so those camera moves ease in gently instead of snapping.
-    local entering_traversal = profile == P.walk or profile == P.sprint or profile == P.idle
-    local leaving_traversal = profile == P.default and (prev == P.walk or prev == P.sprint or prev == P.idle)
+    -- jog/combat, so those camera moves ease in gently instead of snapping.
+    local entering_traversal = profile == PRFL.walk or profile == PRFL.sprint or profile == PRFL.idle
+    local leaving_traversal = profile == PRFL.jog and (prev == PRFL.walk or prev == PRFL.sprint or prev == PRFL.idle)
     if entering_traversal or leaving_traversal then
         steps_override = slow_steps
     end
 
-    if prev == P.lockon and Camera and Camera.begin_lockon_exit_blend then
+    if prev == PRFL.lockon and Camera and Camera.begin_lockon_exit_blend then
         local target_fov = Profiles.fov_for_profile(profile, cfg)
         local target_pos = nil
-        if profile == P.battle then
+        if profile == PRFL.battle then
             target_pos = cfg.CombatPosition
-        elseif profile == P.sprint then
+        elseif profile == PRFL.sprint then
             target_pos = cfg.SprintPosition
-        elseif profile == P.idle then
+        elseif profile == PRFL.idle then
             target_pos = cfg.IdlePosition
-        elseif profile == P.walk then
+        elseif profile == PRFL.walk then
             target_pos = cfg.WalkPosition
-        elseif profile == P.default then
-            target_pos = cfg.DefaultPosition
+        elseif profile == PRFL.jog then
+            target_pos = cfg.JogPosition
         end
 
         Env.run_on_game_thread("stance_lockon_exit_blend", function()
@@ -248,7 +248,7 @@ local function apply_profile(profile, cfg)
 end
 
 function M.get_current_profile()
-    return M._applied_profile or P.default
+    return M._applied_profile or PRFL.jog
 end
 
 function M.reset_state()
@@ -295,7 +295,7 @@ function M.pulse()
 
     apply_profile(profile, cfg)
 
-    if M._applied_profile == P.lockon then
+    if M._applied_profile == PRFL.lockon then
         return
     end
 
