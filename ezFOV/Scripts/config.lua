@@ -188,7 +188,7 @@ local SCHEMA = {
             "; TRANSITION PACING",
             "; Values are durations in milliseconds. Higher = slower / more cinematic.",
             ";",
-            "; TransitionTime: automatic stance transitions (entering combat, lock-on, etc). This",
+            "; TransitionTime: automatic stance transitions (sprint, combat, lock-on, etc). This",
             ";   single value paces BOTH the FOV ease and the camera position move, which run ~1:1."
         ),
     },
