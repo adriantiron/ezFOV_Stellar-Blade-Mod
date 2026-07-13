@@ -59,7 +59,7 @@ local SCHEMA = {
         key = "DisableCameraCollision",
         path = { "DisableCameraCollision" },
         kind = "bool",
-        default = false,
+        default = true,
         section = banner(
             "; CAMERA COLLISION",
             "; Prevents the camera from clipping or snapping aggressively forward when hitting",

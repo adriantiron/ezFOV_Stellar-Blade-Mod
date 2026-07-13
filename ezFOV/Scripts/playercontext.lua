@@ -503,7 +503,9 @@ function PlayerCtx.get_snapshot()
     local pc = PlayerCtx._pc
     local pawn = PlayerCtx._pawn
     local cam = PlayerCtx._cam
-    local boom = PlayerCtx._boom
+    -- Opportunistically fetch the boom so snap.boom is populated (ensure_ready(false) skips it).
+    -- Boom stays OPTIONAL: a nil boom must not fail the snapshot -- only pc/pawn/cam are required.
+    local boom = PlayerCtx.get_camera_boom()
 
     if not (obj_is_valid(pc) and obj_is_valid(pawn) and obj_is_valid(cam)) then
         return nil
