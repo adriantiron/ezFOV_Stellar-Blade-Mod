@@ -46,17 +46,6 @@ local function cancel_post_cold_pulse_timer()
     end
 end
 
-local function is_bootstrap_debug_enabled()
-    if DEBUG_BOOTSTRAP_STATE_MACHINE == true then
-        return true
-    end
-    if not H.config_mod or type(H.config_mod.get) ~= "function" then
-        return false
-    end
-    local cfg = H.config_mod.get()
-    return cfg and cfg.DebugBootstrapStateMachine == true
-end
-
 local function is_valid_bootstrap_transition(from_state, to_state)
     if from_state == to_state then
         return true
@@ -77,7 +66,7 @@ local function set_bootstrap_state(new_state, reason)
     local prev = Bootstrap.state
     Bootstrap.state = new_state
 
-    if not is_bootstrap_debug_enabled() then
+    if not DEBUG_BOOTSTRAP_STATE_MACHINE then
         return
     end
 

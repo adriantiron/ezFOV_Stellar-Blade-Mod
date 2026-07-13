@@ -48,7 +48,6 @@ The FOV and position keys act on the **currently active profile** and are saved 
 > **Hotkey mode:** every key above **except `F8`** is gated by `EnableTuningHotkeys` in `ezFOV.cfg`.
 > Set it to `false` for an F8-only setup that won't clash with other mods' keybinds (applied on game
 > launch / script reload). `F8` live-reload is always available.
-
 > Note: the position axes differ between standard modes (X = depth/zoom, Y = lateral, Z = height) and lock-on
 > mode (rotation-corrected). See `ezFOV/ezFOV.cfg` for the full explanation.
 
