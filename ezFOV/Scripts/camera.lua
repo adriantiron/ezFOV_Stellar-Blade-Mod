@@ -60,7 +60,7 @@ local _last_sin = 0
 local _last_cos = 1
 local _yaw_epsilon = 0.5
 
-local _ENFORCE_TICK_MS = 8
+local _ENFORCE_TICK_MS = 16
 local _ENFORCE_RETRY_MS = 50
 local _enforce_miss_count = 0
 
