@@ -206,7 +206,7 @@ local SCHEMA = {
         kind = "number",
         default = 300,
         section = "; SlowTransitionTime: extra-slow ease used when entering or leaving a traversal /\n"
-            .. "; resting stance (idle, walk, sprint). Overrides TransitionTime for those specific\n"
+            .. "; resting stance (idle, walk). Overrides TransitionTime for those specific\n"
             .. "; moves so they glide in gently instead of snapping. Higher = slower.",
     },
     {

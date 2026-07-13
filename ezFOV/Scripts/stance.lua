@@ -202,9 +202,10 @@ local function apply_profile(profile, cfg)
     local steps_override = nil
 
     -- Slow the transition when entering a traversal/resting state, or when leaving one back to
-    -- jog/combat, so those camera moves ease in gently instead of snapping.
-    local entering_traversal = profile == PRFL.walk or profile == PRFL.sprint or profile == PRFL.idle
-    local leaving_traversal = profile == PRFL.jog and (prev == PRFL.walk or prev == PRFL.sprint or prev == PRFL.idle)
+    -- jog/combat, so those camera moves ease in gently instead of snapping. Sprint is treated as
+    -- an action framing (like jog/combat), so its transitions stay at the normal pace.
+    local entering_traversal = profile == PRFL.walk or profile == PRFL.idle
+    local leaving_traversal = profile == PRFL.jog and (prev == PRFL.walk or prev == PRFL.idle)
     if entering_traversal or leaving_traversal then
         steps_override = slow_steps
     end
