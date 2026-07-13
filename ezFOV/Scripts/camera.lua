@@ -68,6 +68,12 @@ local _ENFORCE_TICK_MS = 16
 local _ENFORCE_RETRY_MS = 50
 local _enforce_miss_count = 0
 
+-- Once an axis' bias has been written non-zero this lock-on session, it stays mod-controlled
+-- (keeps being written, incl. 0) so dialing it back to 0 neutralizes live. A never-touched axis
+-- stays hands-off. Reset on enforcement stop.
+local _yaw_bias_dirty = false
+local _pitch_bias_dirty = false
+
 local _collision_warn_last = {
     missing_snapshot = 0,
     midthread_snapshot = 0,
@@ -711,6 +717,8 @@ local function stop_enforcement_loop()
     M._enforce_fov = nil
     M._enforce_yaw_bias = 0
     M._enforce_pitch_bias = 0
+    _yaw_bias_dirty = false
+    _pitch_bias_dirty = false
 
     if _enforce_token then
         Env.cancel_delay(_enforce_token)
@@ -1144,9 +1152,20 @@ function M.start_enforcement(pos, fov)
         end
 
         -- ===== YAW + PITCH BIAS =====
+        -- Write an axis while its bias is non-zero, and keep writing it (incl. 0) for the rest of
+        -- the session once it has been non-zero (the *_dirty flags) -- so dialing a bias back to 0
+        -- mid-lock-on neutralizes live, while a never-touched axis stays hands-off (game-controlled).
         local has_yaw = M._enforce_yaw_bias and M._enforce_yaw_bias ~= 0
         local has_pitch = M._enforce_pitch_bias and M._enforce_pitch_bias ~= 0
-        if has_yaw or has_pitch then
+        if has_yaw then
+            _yaw_bias_dirty = true
+        end
+        if has_pitch then
+            _pitch_bias_dirty = true
+        end
+        local write_yaw = has_yaw or _yaw_bias_dirty
+        local write_pitch = has_pitch or _pitch_bias_dirty
+        if write_yaw or write_pitch then
             ---@type any
             local enf_cam_any = _enf_cam
             if not obj_is_valid(enf_cam_any) then
@@ -1159,13 +1178,13 @@ function M.start_enforcement(pos, fov)
             local rel_rot = obj_is_valid(enf_cam_any) and enf_cam_any.RelativeRotation or nil
             if rel_rot then
                 local rot_ok = safe_write(function()
-                    if has_yaw then
-                        rel_rot.Yaw = M._enforce_yaw_bias
+                    if write_yaw then
+                        rel_rot.Yaw = M._enforce_yaw_bias or 0
                     end
-                    if has_pitch then
+                    if write_pitch then
                         -- Negative pitch = camera looks down = target shifts UP on screen
                         -- So we negate: positive config value = target UP
-                        rel_rot.Pitch = -M._enforce_pitch_bias
+                        rel_rot.Pitch = -(M._enforce_pitch_bias or 0)
                     end
                 end, "lockon_enforce_write_rot")
                 if not rot_ok then
