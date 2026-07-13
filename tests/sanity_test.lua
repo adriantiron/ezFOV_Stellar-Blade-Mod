@@ -347,8 +347,9 @@ local function run_tests()
         rt.SprintPosition = { x = 220.0, y = 7.0, z = 12.0 }
         rt.LockOnYawBias = 5.0
         rt.LockOnPitchBias = -3.0
-        rt.FOVTransitionSteps = 40
-        rt.KeyFOVTransitionSteps = 15
+        rt.TransitionTime = 40
+        rt.KeyTransitionTime = 15
+        rt.SlowTransitionTime = 250
         rt.LockOnExitBlendTime = 0.25
         rt.DisableCameraCollision = true
         rt.EnableIdleCamera = false
@@ -412,8 +413,9 @@ local function run_tests()
         )
         assert(rt.LockOnYawBias == 5.0, "yaw bias should round-trip")
         assert(rt.LockOnPitchBias == -3.0, "pitch bias should round-trip")
-        assert(rt.FOVTransitionSteps == 40, "fov transition steps should round-trip")
-        assert(rt.KeyFOVTransitionSteps == 15, "key fov transition steps should round-trip")
+        assert(rt.TransitionTime == 40, "transition time should round-trip")
+        assert(rt.KeyTransitionTime == 15, "key transition time should round-trip")
+        assert(rt.SlowTransitionTime == 250, "slow transition time should round-trip")
         assert(rt.LockOnExitBlendTime == 0.25, "blend time should round-trip")
         assert(rt.DisableCameraCollision == true, "collision flag should round-trip")
         assert(rt.EnableTuningHotkeys == false, "tuning hotkeys flag should round-trip")

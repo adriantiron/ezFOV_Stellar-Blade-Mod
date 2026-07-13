@@ -180,15 +180,43 @@ local SCHEMA = {
     { key = "SprintFOV", path = { "fovs", "sprint" }, kind = "number", default = 90, clamp = FOV_CLAMP },
 
     {
-        key = "FOVTransitionSteps",
-        path = { "FOVTransitionSteps" },
+        key = "TransitionTime",
+        path = { "TransitionTime" },
         kind = "number",
-        default = 60,
-        section = "; FOV Transition Smoothness (Higher numbers = slower, more cinematic pacing)",
+        default = 100,
+        section = banner(
+            "; TRANSITION PACING",
+            "; Values are durations in milliseconds. Higher = slower / more cinematic.",
+            ";",
+            "; TransitionTime: automatic stance transitions (entering combat, lock-on, etc). This",
+            ";   single value paces BOTH the FOV ease and the camera position move, which run ~1:1."
+        ),
     },
-    { key = "KeyFOVTransitionSteps", path = { "KeyFOVTransitionSteps" }, kind = "number", default = 20 },
-    { key = "LockOnExitBlendTime", path = { "LockOnExitBlendTime" }, kind = "number", default = 0.1, floor = 0.02 },
-
+    {
+        key = "KeyTransitionTime",
+        path = { "KeyTransitionTime" },
+        kind = "number",
+        default = 50,
+        section = "; KeyTransitionTime: pacing for HOTKEY / live-tuning tweaks (FOV & position moves),\n"
+            .. "; kept shorter than TransitionTime so manual adjustments feel snappy.",
+    },
+    {
+        key = "SlowTransitionTime",
+        path = { "SlowTransitionTime" },
+        kind = "number",
+        default = 300,
+        section = "; SlowTransitionTime: extra-slow ease used when entering or leaving a traversal /\n"
+            .. "; resting stance (idle, walk, sprint). Overrides TransitionTime for those specific\n"
+            .. "; moves so they glide in gently instead of snapping. Higher = slower.",
+    },
+    {
+        key = "LockOnExitBlendTime",
+        path = { "LockOnExitBlendTime" },
+        kind = "number",
+        default = 0.1,
+        floor = 0.02,
+        section = "; LockOnExitBlendTime (seconds): transition time from lock-on to free camera.\n"
+    },
     {
         key = "EnableIdleCamera",
         path = { "EnableIdleCamera" },

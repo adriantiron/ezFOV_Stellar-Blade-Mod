@@ -127,7 +127,7 @@ local function apply_fov_transition(target_fov, steps_override)
         log.error("Unable to apply an FOV transition because the config is invalid.")
         return
     end
-    local steps = steps_override or cfg.FOVTransitionSteps
+    local steps = steps_override or cfg.TransitionTime
     Env.run_on_game_thread("stance_apply_fov", function()
         Camera.set_fov_via_function(target_fov, steps)
     end)
@@ -198,7 +198,7 @@ local function apply_profile(profile, cfg)
         return
     end
 
-    local slow_steps = 100
+    local slow_steps = cfg.SlowTransitionTime or 300
     local steps_override = nil
 
     -- Slow the transition when entering a traversal/resting state, or when leaving one back to

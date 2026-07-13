@@ -305,7 +305,7 @@ function M.set_fov_via_function(target_fov, override_steps)
     end
     M._active_target_fov = target_fov
 
-    local cfg_steps = (M._cfg and M._cfg.FOVTransitionSteps) or 20
+    local cfg_steps = (M._cfg and M._cfg.TransitionTime) or 20
     local steps = override_steps or math_max(cfg_steps, 10)
     local step = 0
     ---@type any
@@ -402,7 +402,7 @@ function M.set_camera_relative_location(target_position, override_steps)
         return
     end
 
-    local cfg_steps = (M._cfg and M._cfg.FOVTransitionSteps) or 100
+    local cfg_steps = (M._cfg and M._cfg.TransitionTime) or 100
     -- steps_units is the transition duration in milliseconds directly.
     local steps_units = override_steps or math_max(cfg_steps, 10)
     local duration_ms = math_max(steps_units, 10)

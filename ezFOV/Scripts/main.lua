@@ -27,7 +27,7 @@ log.debug(
         "Initial config: FOV(jog=%.0f,combat=%.0f,tps=%.0f,idle=%.0f,walk=%.0f,sprint=%.0f,lockon=%.0f) "
             .. "Pos(jog=(%.0f,%.0f,%.0f),combat=(%.0f,%.0f,%.0f),lockon=(%.0f,%.0f,%.0f),idle=(%.0f,%.0f,%.0f),walk=(%.0f,%.0f,%.0f),sprint=(%.0f,%.0f,%.0f)) "
             .. "flags(lockon=%s,idle=%s,walk=%s,sprint=%s,collision=%s) "
-            .. "bias(yaw=%.1f,pitch=%.1f) exit_blend=%.3f steps(fov=%d,key=%d)",
+            .. "bias(yaw=%.1f,pitch=%.1f) exit_blend=%.3f transition(auto=%d,key=%d,slow=%d)",
         cfg.fovs.jog or 0,
         cfg.fovs.combat or 0,
         cfg.fovs.tps or 0,
@@ -61,8 +61,9 @@ log.debug(
         cfg.LockOnYawBias or 0,
         cfg.LockOnPitchBias or 0,
         cfg.LockOnExitBlendTime or 0,
-        cfg.FOVTransitionSteps or 0,
-        cfg.KeyFOVTransitionSteps or 0
+        cfg.TransitionTime or 0,
+        cfg.KeyTransitionTime or 0,
+        cfg.SlowTransitionTime or 0
     ),
     "config_initial_state",
     true
@@ -225,7 +226,7 @@ local function adjust_current_fov(delta)
         Camera.update_enforcement_fov(new_fov)
     else
         Env.run_on_game_thread("adjust_fov", function()
-            Camera.set_fov_via_function(new_fov, current_cfg.KeyFOVTransitionSteps)
+            Camera.set_fov_via_function(new_fov, current_cfg.KeyTransitionTime)
         end)
     end
 
@@ -250,7 +251,7 @@ local function adjust_current_position(axis, delta)
         Camera.update_enforcement_pos(pos)
     else
         Env.run_on_game_thread("adjust_position", function()
-            Camera.set_camera_relative_location(pos, current_cfg.KeyFOVTransitionSteps)
+            Camera.set_camera_relative_location(pos, current_cfg.KeyTransitionTime)
         end)
     end
 
@@ -314,15 +315,15 @@ local function apply_for_current_state()
                 if Camera.cancel_lockon_exit_blend then
                     Camera.cancel_lockon_exit_blend()
                 end
-                Camera.set_fov_via_function(fov, current_cfg.KeyFOVTransitionSteps)
-                Camera.set_camera_relative_location(pos, current_cfg.KeyFOVTransitionSteps)
+                Camera.set_fov_via_function(fov, current_cfg.KeyTransitionTime)
+                Camera.set_camera_relative_location(pos, current_cfg.KeyTransitionTime)
             end
         else
             if Camera.cancel_lockon_exit_blend then
                 Camera.cancel_lockon_exit_blend()
             end
-            Camera.set_fov_via_function(fov, current_cfg.KeyFOVTransitionSteps)
-            Camera.set_camera_relative_location(pos, current_cfg.KeyFOVTransitionSteps)
+            Camera.set_fov_via_function(fov, current_cfg.KeyTransitionTime)
+            Camera.set_camera_relative_location(pos, current_cfg.KeyTransitionTime)
         end
     end
     Camera.disable_camera_collision(current_cfg.DisableCameraCollision)
