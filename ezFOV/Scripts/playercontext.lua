@@ -41,7 +41,7 @@ local function _notify_disable()
     for i = 1, #PlayerCtx._on_disable do
         local ok, err = pcall(PlayerCtx._on_disable[i])
         if not ok then
-            log.error("on_disable handler error: " .. tostring(err), "on_disable_handler_error")
+            log.error("on_disable handler error: " .. tostring(err))
         end
     end
 end

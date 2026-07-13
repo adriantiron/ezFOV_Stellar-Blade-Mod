@@ -222,8 +222,8 @@ local function run_tests()
     Logging.set_debug_cache_enabled(true)
 
     local error_logs = with_captured_print(function()
-        Logging.log_error("Sanity", "error A", "same_key")
-        Logging.log_error("Sanity", "error B", "same_key")
+        Logging.log_error("Sanity", "error A")
+        Logging.log_error("Sanity", "error B")
     end)
     assert(#error_logs == 2, "errors should always emit even with matching once key")
 

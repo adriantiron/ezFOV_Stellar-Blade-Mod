@@ -26,7 +26,7 @@ function Originals.save(snap)
     _saved_originals = {}
 
     if not snap then
-        log.error("Cannot save camera originals because the snapshot is unavailable.", "save_originals_no_snapshot")
+        log.error("Cannot save camera originals because the snapshot is unavailable.")
         return
     end
 

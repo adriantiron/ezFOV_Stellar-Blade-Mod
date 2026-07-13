@@ -186,8 +186,7 @@ local function get_camera_yaw_raw(snap)
     end
 
     log.error(
-        "Unable to locate a valid camera yaw source across the known engine methods; yaw-based bias and lock-on positioning may be unstable.",
-        "yaw_source_failure"
+        "Unable to locate a valid camera yaw source across the known engine methods; yaw-based bias and lock-on positioning may be unstable."
     )
     return 0
 end
@@ -578,7 +577,7 @@ end
 
 function M.init(cfg)
     if not cfg then
-        log.error("Camera initialization aborted because no config was provided.", "camera_init_missing_cfg")
+        log.error("Camera initialization aborted because no config was provided.")
         return
     end
 
@@ -923,10 +922,7 @@ function M.start_enforcement(pos, fov)
     -- Read biases from config
     local cfg = require("config").get()
     if not cfg then
-        log.error(
-            "Lock-on enforcement could not start because the config module returned no data.",
-            "enforcement_start_missing_cfg"
-        )
+        log.error("Lock-on enforcement could not start because the config module returned no data.")
         return
     end
     M._enforce_yaw_bias = cfg.LockOnYawBias or 0

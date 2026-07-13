@@ -13,6 +13,8 @@ function M.log_message(component, level, message, once_key, cache)
     local lvl = tostring(level or "INFO")
     local should_cache = cache == true and once_key ~= nil
 
+    -- ERRORS are always emitted because they represent hard failure signals.
+
     -- Warn cache can be disabled at runtime for deeper troubleshooting sessions.
     if lvl == "WARN" and not _warn_cache_enabled then
         should_cache = false
@@ -35,8 +37,8 @@ function M.log_message(component, level, message, once_key, cache)
 end
 
 -- Errors are always emitted because they represent hard failure signals.
-function M.log_error(component, message, once_key)
-    M.log_message(component, "ERROR", message, once_key)
+function M.log_error(component, message)
+    M.log_message(component, "ERROR", message)
 end
 
 function M.log_warn(component, message, once_key, cache)
@@ -51,8 +53,8 @@ end
 -- Each function mirrors the matching M.log_* minus the leading component argument.
 function M.for_component(component)
     return {
-        error = function(message, once_key)
-            M.log_error(component, message, once_key)
+        error = function(message)
+            M.log_error(component, message)
         end,
         warn = function(message, once_key, cache)
             M.log_warn(component, message, once_key, cache)

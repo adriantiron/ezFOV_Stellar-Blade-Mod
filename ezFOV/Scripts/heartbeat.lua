@@ -56,7 +56,7 @@ end
 
 function Heartbeat.pulse()
     if not Heartbeat or type(Heartbeat) ~= "table" then
-        log.error("Heartbeat.pulse() called but Heartbeat table is invalid.", "heartbeat_invalid")
+        log.error("Heartbeat.pulse() called but Heartbeat table is invalid.")
         return
     end
 

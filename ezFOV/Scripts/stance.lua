@@ -75,10 +75,7 @@ local function choose_profile(state, cfg)
 
     local current_cfg = cfg or (Config and Config.get())
     if not current_cfg or type(current_cfg) ~= "table" or type(current_cfg.fovs) ~= "table" then
-        log.error(
-            "Profile selection aborted because the runtime config is invalid.",
-            "stance_choose_profile_missing_cfg"
-        )
+        log.error("Profile selection aborted because the runtime config is invalid.")
         return P.default
     end
 
@@ -121,16 +118,13 @@ local function apply_fov_transition(target_fov, steps_override)
         return
     end
     if not Camera or not Camera.set_fov_via_function then
-        log.error(
-            "Unable to apply an FOV transition because the camera module is unavailable.",
-            "stance_missing_camera_fov"
-        )
+        log.error("Unable to apply an FOV transition because the camera module is unavailable.")
         return
     end
 
     local cfg = Config.get()
     if not cfg or type(cfg) ~= "table" then
-        log.error("Unable to apply an FOV transition because the config is invalid.", "stance_apply_fov_missing_cfg")
+        log.error("Unable to apply an FOV transition because the config is invalid.")
         return
     end
     local steps = steps_override or cfg.FOVTransitionSteps
@@ -150,10 +144,7 @@ local function apply_position_for_profile(profile, cfg, steps_override)
 
     if pos then
         if not Camera or not Camera.set_camera_relative_location then
-            log.error(
-                "Unable to apply a camera position transition because the camera module is unavailable.",
-                "stance_missing_camera_position"
-            )
+            log.error("Unable to apply a camera position transition because the camera module is unavailable.")
             return
         end
 
@@ -165,10 +156,7 @@ end
 
 local function apply_lockon_profile(cfg)
     if not Camera or not Camera.start_enforcement then
-        log.error(
-            "Unable to enter lock-on mode because the camera module is unavailable.",
-            "stance_missing_camera_start"
-        )
+        log.error("Unable to enter lock-on mode because the camera module is unavailable.")
         return
     end
 
@@ -281,7 +269,7 @@ function M.pulse()
 
     local cfg = Config.get()
     if not cfg or type(cfg) ~= "table" or type(cfg.fovs) ~= "table" then
-        log.error("Stance pulse aborted because the runtime config is invalid.", "stance_pulse_missing_cfg")
+        log.error("Stance pulse aborted because the runtime config is invalid.")
         return
     end
 
@@ -342,10 +330,7 @@ function M.pulse()
         if target_or_err ~= nil then
             Env.run_on_game_thread("stance_enforce_fov", function()
                 if not Camera or type(Camera.enforce_fov) ~= "function" then
-                    log.error(
-                        "Pulse post-apply cannot enforce FOV because Camera.enforce_fov is unavailable.",
-                        "pulse_missing_enforce_fov"
-                    )
+                    log.error("Pulse post-apply cannot enforce FOV because Camera.enforce_fov is unavailable.")
                     return
                 end
                 Camera.enforce_fov(target_or_err)

@@ -13,12 +13,12 @@ local log = Logging.for_component("Main")
 
 local cfg = Config.get()
 if not cfg then
-    log.error("Main initialization could not load config data; retrying once.", "main_init_missing_cfg")
+    log.error("Main initialization could not load config data; retrying once.")
     cfg = Config.reload()
 end
 
 if not cfg then
-    log.error("Main initialization aborted because config data is still unavailable.", "main_init_missing_cfg_final")
+    log.error("Main initialization aborted because config data is still unavailable.")
     return
 end
 
@@ -75,7 +75,7 @@ local ok_init, init_err = pcall(function()
     Hooks.init(Camera, Config)
 end)
 if not ok_init then
-    log.error("Main initialization failed: " .. tostring(init_err), "main_init_failed")
+    log.error("Main initialization failed: " .. tostring(init_err))
     return
 end
 
@@ -96,7 +96,7 @@ log.debug(
 Env.register_safe_keybind(Env.Key.F8, {}, "reload_config_hotkey", function()
     local reloaded_cfg = Config.reload()
     if not reloaded_cfg then
-        log.error("Config reload failed; keeping the previous runtime config.", "config_reload_failed")
+        log.error("Config reload failed; keeping the previous runtime config.")
         return
     end
 
@@ -180,17 +180,11 @@ end
 
 local function ensure_lockon_enforcement(current_cfg)
     if not Camera or not Camera.start_enforcement then
-        log.error(
-            "Unable to restart lock-on enforcement because the camera module is unavailable.",
-            "enforcement_restart_missing_camera"
-        )
+        log.error("Unable to restart lock-on enforcement because the camera module is unavailable.")
         return
     end
     if not current_cfg or type(current_cfg) ~= "table" or not current_cfg.fovs then
-        log.error(
-            "Unable to restart lock-on enforcement because the runtime config is invalid.",
-            "enforcement_restart_missing_cfg"
-        )
+        log.error("Unable to restart lock-on enforcement because the runtime config is invalid.")
         return
     end
 
@@ -205,7 +199,7 @@ end
 local function adjust_current_fov(delta)
     local current_cfg = Config.get()
     if not current_cfg or type(current_cfg) ~= "table" or not current_cfg.fovs then
-        log.error("FOV adjustment aborted because the runtime config is invalid.", "adjust_fov_missing_cfg")
+        log.error("FOV adjustment aborted because the runtime config is invalid.")
         return
     end
 
@@ -243,7 +237,7 @@ end
 local function adjust_current_position(axis, delta)
     local current_cfg = Config.get()
     if not current_cfg or type(current_cfg) ~= "table" then
-        log.error("Position adjustment aborted because the runtime config is invalid.", "adjust_position_missing_cfg")
+        log.error("Position adjustment aborted because the runtime config is invalid.")
         return
     end
 
@@ -268,7 +262,7 @@ end
 local function adjust_lockon_bias(field, delta)
     local current_cfg = Config.get()
     if not current_cfg or type(current_cfg) ~= "table" then
-        log.error("Lock-on bias adjustment aborted because the runtime config is invalid.", "adjust_bias_missing_cfg")
+        log.error("Lock-on bias adjustment aborted because the runtime config is invalid.")
         return
     end
 
@@ -297,7 +291,7 @@ end
 local function apply_for_current_state()
     local current_cfg = Config.get()
     if not current_cfg or type(current_cfg) ~= "table" then
-        log.error("State application aborted because the runtime config is invalid.", "apply_state_missing_cfg")
+        log.error("State application aborted because the runtime config is invalid.")
         return
     end
 

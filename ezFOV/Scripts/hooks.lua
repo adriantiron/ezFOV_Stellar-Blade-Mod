@@ -171,10 +171,7 @@ function H.init(Camera, Config)
     log.debug("Hooks init: starting initialization", "hooks_init_start")
 
     if not Camera or not Config then
-        log.error(
-            "Hooks initialization aborted because the camera or config dependency was missing.",
-            "hooks_init_missing_dependencies"
-        )
+        log.error("Hooks initialization aborted because the camera or config dependency was missing.")
         return
     end
 
@@ -271,10 +268,7 @@ function H.init(Camera, Config)
                         if tps == false and in_battle == false then
                             local cfg = H.config_mod.get()
                             if not cfg or type(cfg) ~= "table" then
-                                log.error(
-                                    "Cold apply skipped because the runtime config is invalid.",
-                                    "cold_apply_missing_cfg"
-                                )
+                                log.error("Cold apply skipped because the runtime config is invalid.")
                                 return -- Exits the pcall, not the hook
                             end
 

@@ -294,10 +294,7 @@ local function load_file(path, container)
 
     if not success then
         if not _config_corrupt_warned then
-            log.error(
-                "Core syntax error or corruption detected in ezFOV.cfg; falling back to factory defaults.",
-                "config_corrupt_fallback"
-            )
+            log.error("Core syntax error or corruption detected in ezFOV.cfg; falling back to factory defaults.")
             _config_corrupt_warned = true
         end
         return new_default_config() -- Secure fallback
@@ -414,15 +411,12 @@ function M.write()
 
         local cfg = M.get()
         if not cfg or type(cfg) ~= "table" then
-            log.error(
-                "Config file write failed because the runtime config is invalid.",
-                "config_write_timer_missing_cfg"
-            )
+            log.error("Config file write failed because the runtime config is invalid.")
             return
         end
 
         if not write_config_to(cfg.path, cfg, { header = HEADER, sections = true }) then
-            log.error("Could not open config file for writing.", "config_write_open_failed")
+            log.error("Could not open config file for writing.")
             return
         end
 
@@ -435,24 +429,21 @@ function M.save_preset(num)
         local cfg = M.get()
         local p = cfg.path .. "_preset" .. tostring(num)
         if not write_config_to(p, cfg, { header = "; PRESET " .. num .. "\n\n", sections = false }) then
-            log.error(format("Could not save preset %d.", num), "preset_save_open_failed")
+            log.error(format("Could not save preset %d.", num))
             return
         end
         log.debug(format("Saved preset %d.", num), "preset_saved")
     end)
 
     if not ok then
-        log.error(format("Preset %d save failed: %s", num, tostring(err)), "preset_save_failed")
+        log.error(format("Preset %d save failed: %s", num, tostring(err)))
     end
 end
 
 function M.load_preset(num)
     local cfg = M.get()
     if not cfg or type(cfg) ~= "table" or type(cfg.fovs) ~= "table" then
-        log.error(
-            format("Preset %d load failed because the runtime config is invalid.", num),
-            "preset_load_missing_cfg"
-        )
+        log.error(format("Preset %d load failed because the runtime config is invalid.", num))
         return false
     end
 
@@ -472,7 +463,7 @@ function M.load_preset(num)
         return load_file(p, container)
     end)
     if not ok or not loaded or type(loaded.fovs) ~= "table" then
-        log.error(format("Preset %d file is malformed or has invalid structure.", num), "preset_invalid")
+        log.error(format("Preset %d file is malformed or has invalid structure.", num))
         return false
     end
 
