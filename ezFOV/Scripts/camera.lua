@@ -38,7 +38,6 @@ local M = {
     _lockon_exit_to_pos = nil,
     _lockon_exit_from_fov = nil,
     _lockon_exit_to_fov = nil,
-    _lockon_was_active = false,
 
     _enforce_pos = nil,
     _enforce_fov = nil,
@@ -107,23 +106,29 @@ local function collision_warn_throttled(slot, message)
     log.warn(message)
 end
 
-local function lockon_diag_debug(slot, message)
+local function lockon_diag_debug(slot, message, ...)
     local now = os_clock()
     local last = _lockon_diag_last[slot] or 0
     if (now - last) < _LOCKON_DIAG_INTERVAL_SEC then
         return
     end
     _lockon_diag_last[slot] = now
+    if select("#", ...) > 0 then
+        message = string.format(message, ...)
+    end
     log.debug(message, "lockon_diag_" .. tostring(slot), true)
 end
 
-local function lockon_diag_warn(slot, message)
+local function lockon_diag_warn(slot, message, ...)
     local now = os_clock()
     local last = _lockon_diag_last[slot] or 0
     if (now - last) < _LOCKON_DIAG_INTERVAL_SEC then
         return
     end
     _lockon_diag_last[slot] = now
+    if select("#", ...) > 0 then
+        message = string.format(message, ...)
+    end
     log.warn(message)
 end
 
@@ -698,7 +703,6 @@ local function stop_enforcement_loop()
     M._enforce_fov = nil
     M._enforce_yaw_bias = 0
     M._enforce_pitch_bias = 0
-    M._lockon_was_active = false
 
     if _enforce_token then
         Env.cancel_delay(_enforce_token)
@@ -917,7 +921,6 @@ function M.start_enforcement(pos, fov)
 
     M._enforce_pos = pos and { x = pos.x or 0, y = pos.y or 0, z = pos.z or 0 } or nil
     M._enforce_fov = fov
-    M._lockon_was_active = true
 
     M.cancel_lockon_exit_blend()
 
@@ -980,34 +983,30 @@ function M.start_enforcement(pos, fov)
 
             lockon_diag_debug(
                 "branch",
-                string.format(
-                    "Lock-on position branch reached: enforce=(%.2f, %.2f, %.2f) sin=%.4f cos=%.4f world=(%.2f, %.2f, %.2f)",
-                    lateral,
-                    depth,
-                    height,
-                    sin_y or 0,
-                    cos_y or 0,
-                    world_x,
-                    world_y,
-                    height
-                )
+                "Lock-on position branch reached: enforce=(%.2f, %.2f, %.2f) sin=%.4f cos=%.4f world=(%.2f, %.2f, %.2f)",
+                lateral,
+                depth,
+                height,
+                sin_y or 0,
+                cos_y or 0,
+                world_x,
+                world_y,
+                height
             )
 
             if math_abs(lateral) > 0.01 or math_abs(depth) > 0.01 then
                 if math_abs(world_x) <= 0.01 and math_abs(world_y) <= 0.01 then
                     lockon_diag_warn(
                         "collapsed",
-                        string.format(
-                            "Lock-on position math collapsed to near-zero world offset: enforce=(%.2f, %.2f, %.2f) sin=%.4f cos=%.4f world=(%.2f, %.2f, %.2f)",
-                            lateral,
-                            depth,
-                            height,
-                            sin_y or 0,
-                            cos_y or 0,
-                            world_x,
-                            world_y,
-                            height
-                        )
+                        "Lock-on position math collapsed to near-zero world offset: enforce=(%.2f, %.2f, %.2f) sin=%.4f cos=%.4f world=(%.2f, %.2f, %.2f)",
+                        lateral,
+                        depth,
+                        height,
+                        sin_y or 0,
+                        cos_y or 0,
+                        world_x,
+                        world_y,
+                        height
                     )
                 end
             end
@@ -1018,12 +1017,10 @@ function M.start_enforcement(pos, fov)
                 if to then
                     lockon_diag_debug(
                         "success",
-                        string.format(
-                            "Lock-on position attempting TargetOffset write: target=(%.2f, %.2f, %.2f)",
-                            world_x,
-                            world_y,
-                            height
-                        )
+                        "Lock-on position attempting TargetOffset write: target=(%.2f, %.2f, %.2f)",
+                        world_x,
+                        world_y,
+                        height
                     )
                     local pos_ok = safe_write(function()
                         to.X = world_x
