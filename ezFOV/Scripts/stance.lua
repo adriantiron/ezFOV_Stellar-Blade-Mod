@@ -211,6 +211,9 @@ local function apply_profile(profile, cfg)
 
     if prev == PRFL.lockon and Camera and Camera.begin_lockon_exit_blend then
         local target_fov = Profiles.fov_for_profile(profile, cfg)
+        -- Keep stance's FOV model in sync with what the exit blend (or its fallback) produces,
+        -- so a later apply_fov_transition dedup does not wrongly skip a real transition.
+        M._applied_fov = target_fov
         local target_pos = nil
         if profile == PRFL.battle then
             target_pos = cfg.CombatPosition

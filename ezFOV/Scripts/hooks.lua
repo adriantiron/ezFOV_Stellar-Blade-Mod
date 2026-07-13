@@ -41,7 +41,7 @@ end
 
 local function cancel_post_cold_pulse_timer()
     if Bootstrap.post_pulse_token then
-        Env.CancelDelay(Bootstrap.post_pulse_token)
+        Env.cancel_delay(Bootstrap.post_pulse_token)
         Bootstrap.post_pulse_token = nil
     end
 end
