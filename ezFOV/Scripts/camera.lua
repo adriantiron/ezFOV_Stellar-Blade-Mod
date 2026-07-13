@@ -38,6 +38,10 @@ local M = {
     _lockon_exit_to_pos = nil,
     _lockon_exit_from_fov = nil,
     _lockon_exit_to_fov = nil,
+    _lockon_exit_from_target = nil,
+    _lockon_exit_to_target = nil,
+    _lockon_exit_from_rot = nil,
+    _lockon_exit_to_rot = nil,
 
     _enforce_pos = nil,
     _enforce_fov = nil,
@@ -232,6 +236,10 @@ local function cancel_lockon_exit_blend()
     M._lockon_exit_to_pos = nil
     M._lockon_exit_from_fov = nil
     M._lockon_exit_to_fov = nil
+    M._lockon_exit_from_target = nil
+    M._lockon_exit_to_target = nil
+    M._lockon_exit_from_rot = nil
+    M._lockon_exit_to_rot = nil
 end
 
 PlayerCtx.on_disable(function()
@@ -775,6 +783,28 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
         to_fov = (cfg and cfg.fovs and cfg.fovs.jog) or from_fov
     end
 
+    -- Capture the lock-on TargetOffset (boom) and RelativeRotation (cam) so the blend can ease
+    -- them back to their pre-lock-on originals instead of leaving them orphaned at lock-on values.
+    local from_target, to_target = nil, nil
+    local from_rot, to_rot = nil, nil
+    local saved = Originals.get_saved()
+    if saved then
+        if saved.target and obj_is_valid(snap.boom) then
+            local bto = snap.boom.TargetOffset
+            if bto then
+                from_target = { x = bto.X or 0, y = bto.Y or 0, z = bto.Z or 0 }
+                to_target = { x = saved.target.X or 0, y = saved.target.Y or 0, z = saved.target.Z or 0 }
+            end
+        end
+        if saved.rel_rot then
+            local rr = cam_any.RelativeRotation
+            if rr then
+                from_rot = { pitch = rr.Pitch or 0, yaw = rr.Yaw or 0, roll = rr.Roll or 0 }
+                to_rot = { pitch = saved.rel_rot.Pitch or 0, yaw = saved.rel_rot.Yaw or 0, roll = saved.rel_rot.Roll or 0 }
+            end
+        end
+    end
+
     if to_fov == nil and (not to_pos or (to_pos.x == 0 and to_pos.y == 0 and to_pos.z == 0)) then
         log.warn(
             "Lock-on exit blend skipped because there was no valid target FOV or position.",
@@ -807,6 +837,10 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
     M._lockon_exit_to_pos = to_pos
     M._lockon_exit_from_fov = from_fov
     M._lockon_exit_to_fov = to_fov
+    M._lockon_exit_from_target = from_target
+    M._lockon_exit_to_target = to_target
+    M._lockon_exit_from_rot = from_rot
+    M._lockon_exit_to_rot = to_rot
 
     local function tick()
         if PlayerCtx.camera_or_pc_invalid() then
@@ -863,6 +897,32 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
             end
         end
 
+        -- Ease the boom TargetOffset back toward its original (best-effort; never aborts the blend).
+        if M._lockon_exit_from_target and M._lockon_exit_to_target and obj_is_valid(snap_now.boom) then
+            local bto = snap_now.boom.TargetOffset
+            if bto then
+                local ft, tt = M._lockon_exit_from_target, M._lockon_exit_to_target
+                safe_write(function()
+                    bto.X = ft.x + (tt.x - ft.x) * eased
+                    bto.Y = ft.y + (tt.y - ft.y) * eased
+                    bto.Z = ft.z + (tt.z - ft.z) * eased
+                end, "lockon_exit_write_target")
+            end
+        end
+
+        -- Ease the camera RelativeRotation (yaw/pitch bias) back toward its original.
+        if M._lockon_exit_from_rot and M._lockon_exit_to_rot then
+            local rr = cam_now.RelativeRotation
+            if rr then
+                local fr, tr = M._lockon_exit_from_rot, M._lockon_exit_to_rot
+                safe_write(function()
+                    rr.Pitch = fr.pitch + (tr.pitch - fr.pitch) * eased
+                    rr.Yaw = fr.yaw + (tr.yaw - fr.yaw) * eased
+                    rr.Roll = fr.roll + (tr.roll - fr.roll) * eased
+                end, "lockon_exit_write_rot")
+            end
+        end
+
         if t < 1.0 then
             M._lockon_exit_token = Env.run_after_delay(8, "lockon_exit_blend", tick)
             return
@@ -895,6 +955,33 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
                 return
             end
         end
+
+        if M._lockon_exit_from_target and M._lockon_exit_to_target and obj_is_valid(snap_now.boom) then
+            local bto = snap_now.boom.TargetOffset
+            if bto then
+                local tt = M._lockon_exit_to_target
+                safe_write(function()
+                    bto.X = tt.x
+                    bto.Y = tt.y
+                    bto.Z = tt.z
+                end, "lockon_exit_finalize_target")
+            end
+        end
+
+        if M._lockon_exit_from_rot and M._lockon_exit_to_rot then
+            local rr = cam_now.RelativeRotation
+            if rr then
+                local tr = M._lockon_exit_to_rot
+                safe_write(function()
+                    rr.Pitch = tr.pitch
+                    rr.Yaw = tr.yaw
+                    rr.Roll = tr.roll
+                end, "lockon_exit_finalize_rot")
+            end
+        end
+
+        -- Originals now handed back to the game; drop them so the next lock-on re-captures fresh.
+        Originals.clear()
 
         cancel_lockon_exit_blend()
     end

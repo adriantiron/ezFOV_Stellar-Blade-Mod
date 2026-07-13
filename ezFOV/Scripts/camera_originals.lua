@@ -90,4 +90,22 @@ function Originals.restore()
     end
 end
 
+-- Read-only access to the captured originals ({ target = {X,Y,Z}, rel_rot = {Pitch,Yaw,Roll} }),
+-- or nil when nothing is saved. Either field may be nil if that object was invalid at save time.
+-- Used by the lock-on exit blend to ease TargetOffset / RelativeRotation back to their
+-- pre-lock-on values instead of snapping.
+function Originals.get_saved()
+    if not _originals_saved then
+        return nil
+    end
+    return _saved_originals
+end
+
+-- Discard the saved originals WITHOUT applying them (e.g. once the exit blend has itself eased
+-- the camera back), so the next enforcement start re-captures fresh originals.
+function Originals.clear()
+    _originals_saved = false
+    _saved_originals = {}
+end
+
 return Originals
