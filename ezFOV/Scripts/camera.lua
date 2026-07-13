@@ -569,7 +569,9 @@ function M.disable_camera_collision(flag)
             )
             return
         end
-        snap.boom.bDoCollisionTest = not flag
+        safe_write(function()
+            snap.boom.bDoCollisionTest = not flag
+        end, "disable_camera_collision_write")
     end)
 end
 
