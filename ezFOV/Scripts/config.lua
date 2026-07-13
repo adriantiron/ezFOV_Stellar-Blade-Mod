@@ -187,7 +187,7 @@ local SCHEMA = {
         section = "; FOV Transition Smoothness (Higher numbers = slower, more cinematic pacing)",
     },
     { key = "KeyFOVTransitionSteps", path = { "KeyFOVTransitionSteps" }, kind = "number", default = 20 },
-    { key = "LockOnExitBlendTime", path = { "LockOnExitBlendTime" }, kind = "number", default = 0.16, floor = 0.02 },
+    { key = "LockOnExitBlendTime", path = { "LockOnExitBlendTime" }, kind = "number", default = 0.1, floor = 0.02 },
 
     {
         key = "EnableIdleCamera",

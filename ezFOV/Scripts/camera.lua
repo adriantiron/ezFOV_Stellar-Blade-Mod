@@ -745,7 +745,7 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
 
     local cfg = M._cfg or require("config").get()
     local blend_seconds = (type(duration_override) == "number" and duration_override > 0) and duration_override
-        or ((cfg and cfg.LockOnExitBlendTime) or 0.16)
+        or ((cfg and cfg.LockOnExitBlendTime) or 0.1)
     local duration_ms = math_max(math_floor(blend_seconds * 1000), 20)
 
     local snap = PlayerCtx.get_snapshot()
