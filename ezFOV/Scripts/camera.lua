@@ -42,6 +42,9 @@ local M = {
     _lockon_exit_to_target = nil,
     _lockon_exit_from_rot = nil,
     _lockon_exit_to_rot = nil,
+    _lockon_exit_rot_dur_ms = nil,
+    _lockon_exit_rot_done = false,
+    _lockon_exit_target_done = false,
 
     _enforce_pos = nil,
     _enforce_fov = nil,
@@ -67,6 +70,13 @@ local _yaw_epsilon = 0.5
 local _ENFORCE_TICK_MS = 16
 local _ENFORCE_RETRY_MS = 50
 local _enforce_miss_count = 0
+
+-- Cap (ms) on how long the lock-on EXIT blend eases the contended props (RelativeRotation bias +
+-- lock-on TargetOffset) back to neutral. These fight the game's own un-track, so we resolve them
+-- over min(LockOnExitBlendTime, this cap) and then hand them off -- while position + FOV keep
+-- gliding over the full LockOnExitBlendTime. Keeping the contended window short + constant is what
+-- stops the exit stutter from scaling with LockOnExitBlendTime.
+local _LOCKON_ROT_HANDOFF_MS = 120
 
 -- Once an axis' bias has been written non-zero this lock-on session, it stays mod-controlled
 -- (keeps being written, incl. 0) so dialing it back to 0 neutralizes live. A never-touched axis
@@ -246,6 +256,9 @@ local function cancel_lockon_exit_blend()
     M._lockon_exit_to_target = nil
     M._lockon_exit_from_rot = nil
     M._lockon_exit_to_rot = nil
+    M._lockon_exit_rot_dur_ms = nil
+    M._lockon_exit_rot_done = false
+    M._lockon_exit_target_done = false
 end
 
 PlayerCtx.on_disable(function()
@@ -850,6 +863,11 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
     M._lockon_exit_to_target = to_target
     M._lockon_exit_from_rot = from_rot
     M._lockon_exit_to_rot = to_rot
+    -- Rotation + lock-on TargetOffset ease over a SHORT capped window (never longer than the
+    -- position/FOV blend), then get handed off to the game (see _LOCKON_ROT_HANDOFF_MS).
+    M._lockon_exit_rot_dur_ms = math_min(duration_ms, _LOCKON_ROT_HANDOFF_MS)
+    M._lockon_exit_rot_done = false
+    M._lockon_exit_target_done = false
 
     local function tick()
         if PlayerCtx.camera_or_pc_invalid() then
@@ -873,6 +891,12 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
         local dur = math_max(M._lockon_exit_duration_ms or duration_ms, 20)
         local t = math_min(math_max(elapsed / dur, 0), 1)
         local eased = quadratic(t, 0, 1, 1)
+
+        -- Rotation + lock-on TargetOffset run on a shorter, capped clock so their contention with
+        -- the game's un-track ends fast (and never scales with LockOnExitBlendTime).
+        local rot_dur = math_max(M._lockon_exit_rot_dur_ms or dur, 20)
+        local t_rot = math_min(math_max(elapsed / rot_dur, 0), 1)
+        local eased_rot = quadratic(t_rot, 0, 1, 1)
 
         if M._lockon_exit_from_pos and M._lockon_exit_to_pos then
             ---@type any
@@ -908,34 +932,48 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
 
         -- Shrink the lock-on TargetOffset toward its original in FACING space: re-apply the
         -- current yaw each tick to the fading lock-on offset, easing the original in as it fades.
-        if M._lockon_exit_lockon_off and M._lockon_exit_to_target and obj_is_valid(snap_now.boom) then
+        -- Runs on the short rot clock and stops writing once handed off (target_done).
+        if
+            not M._lockon_exit_target_done
+            and M._lockon_exit_lockon_off
+            and M._lockon_exit_to_target
+            and obj_is_valid(snap_now.boom)
+        then
             local bto = snap_now.boom.TargetOffset
             if bto then
                 local off, tt = M._lockon_exit_lockon_off, M._lockon_exit_to_target
-                local scale = 1 - eased
+                local scale = 1 - eased_rot
                 local sin_y, cos_y = get_yaw_sincos(snap_now)
                 local lat = (off.x or 0) * scale
                 local dep = (off.y or 0) * scale
                 local wx = lat * -sin_y + dep * cos_y
                 local wy = lat * cos_y + dep * sin_y
                 safe_write(function()
-                    bto.X = wx + tt.x * eased
-                    bto.Y = wy + tt.y * eased
-                    bto.Z = (off.z or 0) * scale + tt.z * eased
+                    bto.X = wx + tt.x * eased_rot
+                    bto.Y = wy + tt.y * eased_rot
+                    bto.Z = (off.z or 0) * scale + tt.z * eased_rot
                 end, "lockon_exit_write_target")
+                if t_rot >= 1.0 then
+                    M._lockon_exit_target_done = true
+                end
             end
         end
 
-        -- Ease the camera RelativeRotation (yaw/pitch bias) back toward its original.
-        if M._lockon_exit_from_rot and M._lockon_exit_to_rot then
+        -- Ease the camera RelativeRotation (yaw/pitch bias) back toward its original on the short
+        -- rot clock, then stop writing (rot_done) so the game fully owns rotation for the rest of
+        -- the (longer) position/FOV glide.
+        if not M._lockon_exit_rot_done and M._lockon_exit_from_rot and M._lockon_exit_to_rot then
             local rr = cam_now.RelativeRotation
             if rr then
                 local fr, tr = M._lockon_exit_from_rot, M._lockon_exit_to_rot
                 safe_write(function()
-                    rr.Pitch = fr.pitch + (tr.pitch - fr.pitch) * eased
-                    rr.Yaw = fr.yaw + (tr.yaw - fr.yaw) * eased
-                    rr.Roll = fr.roll + (tr.roll - fr.roll) * eased
+                    rr.Pitch = fr.pitch + (tr.pitch - fr.pitch) * eased_rot
+                    rr.Yaw = fr.yaw + (tr.yaw - fr.yaw) * eased_rot
+                    rr.Roll = fr.roll + (tr.roll - fr.roll) * eased_rot
                 end, "lockon_exit_write_rot")
+                if t_rot >= 1.0 then
+                    M._lockon_exit_rot_done = true
+                end
             end
         end
 
@@ -972,7 +1010,12 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
             end
         end
 
-        if M._lockon_exit_lockon_off and M._lockon_exit_to_target and obj_is_valid(snap_now.boom) then
+        if
+            not M._lockon_exit_target_done
+            and M._lockon_exit_lockon_off
+            and M._lockon_exit_to_target
+            and obj_is_valid(snap_now.boom)
+        then
             local bto = snap_now.boom.TargetOffset
             if bto then
                 local tt = M._lockon_exit_to_target
@@ -984,7 +1027,7 @@ function M.begin_lockon_exit_blend(target_position, target_fov, _override_steps,
             end
         end
 
-        if M._lockon_exit_from_rot and M._lockon_exit_to_rot then
+        if not M._lockon_exit_rot_done and M._lockon_exit_from_rot and M._lockon_exit_to_rot then
             local rr = cam_now.RelativeRotation
             if rr then
                 local tr = M._lockon_exit_to_rot
